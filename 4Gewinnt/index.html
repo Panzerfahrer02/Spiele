@@ -1,1 +1,346 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>4 Gewinnt – Eule vs. Zëbra (Link-Duell)</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --card:#121823; --ink:#e8eef7; --muted:#9bb0c5;
+      --red:#ff4d5e; --yellow:#ffd34d; --grid:#0f253b; --win:#35e0a1;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
+      background:radial-gradient(1000px 600px at 10% 0%,#13253b,var(--bg));
+      color:var(--ink); display:grid; place-items:center; min-height:100svh; padding:24px;
+    }
+    .wrap{width:100%; max-width:900px}
+    header{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:10px; flex-wrap:wrap}
+    h1{margin:0; font-size:22px; letter-spacing:.2px}
+    .controls{display:flex; gap:8px; flex-wrap:wrap}
+    button{
+      appearance:none; border:1px solid rgba(255,255,255,.15); color:var(--ink);
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+      padding:10px 12px; border-radius:12px; cursor:pointer; font-size:14px;
+    }
+    button:hover{border-color:rgba(255,255,255,.28)}
+    .status{
+      background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
+      border:1px solid rgba(255,255,255,.1); border-radius:14px; padding:12px 14px; margin-bottom:10px;
+      display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    }
+    .who{display:flex; align-items:center; gap:10px}
+    .disc{width:20px; height:20px; border-radius:50%}
+    .disc.red{background:var(--red); box-shadow:0 0 0 2px rgba(255,77,94,.25)}
+    .disc.yellow{background:var(--yellow); box-shadow:0 0 0 2px rgba(255,211,77,.25)}
+    .muted{color:var(--muted)}
+    .note{font-size:13px; color:var(--muted)}
+    .board-wrap{
+      background:var(--card); border:1px solid rgba(255,255,255,.1);
+      border-radius:18px; padding:14px; box-shadow:0 10px 35px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+      margin-top:6px;
+    }
+    .board{
+      --cols:7; --rows:6;
+      display:grid; grid-template-columns:repeat(var(--cols), 1fr); gap:10px;
+      background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.01));
+      padding:10px; border-radius:14px;
+    }
+    .col{display:grid; grid-template-rows:repeat(var(--rows), 1fr); gap:10px; cursor:pointer}
+    .col.disabled{pointer-events:none; opacity:.65}
+    .cell{
+      width:100%; aspect-ratio:1/1; border-radius:50%;
+      background:radial-gradient(circle at 35% 35%, #1b3958, var(--grid));
+      display:grid; place-items:center; position:relative; overflow:hidden;
+      box-shadow:inset 0 5px 10px rgba(0,0,0,.5), inset 0 -4px 8px rgba(0,0,0,.35);
+    }
+    .chip{
+      width:90%; height:90%; border-radius:50%; transform:translateY(-140%); opacity:0;
+      transition:transform .22s cubic-bezier(.2,.9,.2,1.2), opacity .12s ease;
+    }
+    .chip.show{transform:translateY(0); opacity:1}
+    .chip.red{background:radial-gradient(circle at 35% 35%, #ff8a96, var(--red))}
+    .chip.yellow{background:radial-gradient(circle at 35% 35%, #ffe89a, var(--yellow))}
+    .cell.win{outline:3px solid var(--win); outline-offset:-3px; box-shadow:0 0 0 3px rgba(53,224,161,.18), inset 0 0 0 999px rgba(53,224,161,.08)}
+    .last{box-shadow:inset 0 0 0 3px rgba(255,255,255,.08)}
+    .linkbox{width:100%; min-height:76px; border-radius:12px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.04); color:var(--ink); padding:10px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; margin-top:10px}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px}
+    .start-screen{padding:20px; border:1px solid rgba(255,255,255,.1); border-radius:16px; background:var(--card); text-align:center}
+    .start-screen h2{margin-top:0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>4 Gewinnt – 🦉 Eule (🔴) vs. 🦓 Zëbra (🟡)</h1>
+      <div class="controls">
+        <button id="btn-new">Neue Serie</button>
+      </div>
+    </header>
 
+    <div id="start-area" class="start-screen" style="display:none">
+      <h2>Wer startet?</h2>
+      <p>Wähle aus, ob <b>🦉 Eule</b> oder <b>🦓 Zëbra</b> beginnen soll:</p>
+      <div class="row">
+        <button id="start-eule">🦉 Eule beginnt</button>
+        <button id="start-zebra">🦓 Zëbra beginnt</button>
+      </div>
+    </div>
+
+    <div id="game-area" style="display:none">
+      <div class="status">
+        <div class="who">
+          <span id="turn-dot" class="disc red" aria-hidden="true"></span>
+          <span id="status-text">…</span>
+        </div>
+        <div class="note">Nach deinem Zug erscheint ein Link. Schicke ihn dem/der anderen. Genau 1 Zug pro Link.</div>
+      </div>
+
+      <div class="board-wrap">
+        <div id="board" class="board" role="grid" aria-label="Vier Gewinnt"></div>
+      </div>
+
+      <div id="share-area" style="display:none">
+        <div class="row note">Sende diesen Link an deinen Mitspieler:</div>
+        <textarea id="share-link" class="linkbox" readonly></textarea>
+        <div class="row"><button id="btn-copy">Link kopieren</button></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Config ---
+    const COLS=7, ROWS=6;
+    const P1=1, P2=2; // P1 = Eule/rot, P2 = Zëbra/gelb (Farben bleiben fix)
+    const EMOJI = { [P1]:"🦉 Eule", [P2]:"🦓 Zëbra" };
+    const DOT = { [P1]:"red", [P2]:"yellow" };
+    const CHIP = DOT;
+
+    // --- DOM ---
+    const $ = s => document.querySelector(s);
+    const $board = $("#board");
+    const $status = $("#status-text");
+    const $dot = $("#turn-dot");
+    const $share = $("#share-area");
+    const $shareLink = $("#share-link");
+
+    // --- URL / Startwahl ---
+    const Q = new URLSearchParams(location.search);
+    const movesStr = Q.get("m") || "";
+    // 'st' (starter) = wer beginnt: 'eule' | 'zebra'
+    const rawStarter = Q.get("st");
+    const starter = (!rawStarter || rawStarter === "null" || rawStarter === "") ? null : rawStarter;
+    // 'to' = wer SOLL diesen Link benutzen (optional)
+    const rawTo = Q.get("to");
+    let to = (!rawTo || rawTo === "null" || rawTo === "") ? null : rawTo;
+
+    // Falls noch keine Züge und kein Starter: Startscreen zeigen
+    if (!movesStr && !starter){
+      $("#start-area").style.display = "block";
+      $("#game-area").style.display = "none";
+      $("#start-eule").onclick  = ()=> location.href = makeLink("", "eule", "eule");  // Eule beginnt, Eule ist dran
+      $("#start-zebra").onclick = ()=> location.href = makeLink("", "zebra", "zebra"); // Zebra beginnt, Zebra ist dran
+    } else {
+      $("#start-area").style.display = "none";
+      $("#game-area").style.display = "block";
+      startGame();
+    }
+
+    function baseUrl(){ return location.origin + location.pathname; }
+
+    // Link-Builder: setzt nur Parameter, die Sinn ergeben
+    function makeLink(mStr, st, toWho){
+      const u = new URL(baseUrl());
+      if (mStr) u.searchParams.set("m", mStr);
+      if (st)   u.searchParams.set("st", st);
+      if (toWho) u.searchParams.set("to", toWho);
+      return u.toString();
+    }
+
+    // --- Spielstart ---
+    function startGame(){
+      // Board aufbauen aus Zugfolge
+      let board = Array.from({length:ROWS}, ()=> Array(COLS).fill(0));
+      let lastMove = null;
+
+      // Hilfsfunktionen
+      const whoAfterIndex = (i)=> {
+        // i = Zugindex (0-basiert), Starter spielt bei i%2==0
+        const w = (i % 2 === 0) ? (starter || "eule") : ((starter || "eule") === "eule" ? "zebra" : "eule");
+        return (w === "eule") ? P1 : P2;
+      };
+      const currentPlayer = ()=> whoAfterIndex(movesStr.length);
+
+      applyMovesFromString(movesStr);
+
+      let winnerInfo = computeWinnerInfo();
+      const fullAtStart = isBoardFull();
+
+      // Wenn 'to' nicht gesetzt oder inkonsistent → auf aktuellen Spieler setzen
+      if (!to || (to === "eule" && currentPlayer()!==P1) || (to === "zebra" && currentPlayer()!==P2)){
+        to = (currentPlayer()===P1) ? "eule" : "zebra";
+        history.replaceState({}, "", makeLink(movesStr, starter || "eule", to));
+      }
+
+      buildBoard();
+      paintBoard();
+      updateStatus();
+
+      if (winnerInfo || fullAtStart) disableInput();
+
+      // ----- Funktionen -----
+      function applyMovesFromString(mStr){
+        for(let i=0;i<mStr.length;i++){
+          const col = parseInt(mStr[i],10);
+          const player = whoAfterIndex(i); // abhängig vom Starter!
+          const row = findDropRow(col);
+          if(row === -1) break;
+          board[row][col] = player;
+          lastMove = {col,row,player};
+        }
+      }
+
+      function buildBoard(){
+        $board.style.setProperty("--cols", COLS);
+        $board.style.setProperty("--rows", ROWS);
+        $board.innerHTML = "";
+        for (let c=0;c<COLS;c++){
+          const col = document.createElement("div");
+          col.className = "col";
+          col.dataset.col = c;
+          col.addEventListener("click", onColumnClick);
+          for (let r=0;r<ROWS;r++){
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            const chip = document.createElement("div");
+            chip.className = "chip";
+            cell.appendChild(chip);
+            col.appendChild(cell);
+          }
+          $board.appendChild(col);
+        }
+      }
+
+      function paintBoard(){
+        for(let r=0;r<ROWS;r++){
+          for(let c=0;c<COLS;c++){
+            const v = board[r][c];
+            const cell = getCellEl(c,r);
+            const chip = cell.querySelector(".chip");
+            chip.className = "chip" + (v? " show " + (v===P1? "red":"yellow") : "");
+            cell.classList.remove("last","win");
+          }
+        }
+        if(lastMove) getCellEl(lastMove.col,lastMove.row).classList.add("last");
+        if (winnerInfo){
+          for(const {c,r} of winnerInfo.line){ getCellEl(c,r).classList.add("win"); }
+        }
+      }
+
+      function getCellEl(c,r){ return $board.children[c].children[r]; }
+      function findDropRow(col){ for(let r=ROWS-1;r>=0;r--) if(board[r][col]===0) return r; return -1; }
+      function isBoardFull(){ return board.every(row => row.every(v => v!==0)); }
+      function playerName(p){ return EMOJI[p]; }
+
+      function updateStatus(){
+        if (winnerInfo){
+          $status.innerHTML = `Sieg! ${playerName(winnerInfo.player)} hat 4 in einer Linie.`;
+          $dot.className = "disc " + (winnerInfo.player===P1? "red":"yellow");
+          showShare(false);
+          return;
+        }
+        if (isBoardFull()){
+          $status.textContent = "Unentschieden – Brett ist voll.";
+          $dot.className = "disc";
+          showShare(false);
+          return;
+        }
+        const p = currentPlayer();
+        $status.innerHTML = `${playerName(p)} ist dran`;
+        $dot.className = "disc " + (p===P1? "red":"yellow");
+
+        // nur der richtige Spieler darf klicken
+        const linkOwner = (to === "eule") ? P1 : P2;
+        if (linkOwner !== p){ disableInput(); showShare(false); }
+        else { enableInput(); showShare(false); }
+      }
+
+      function onColumnClick(e){
+        if (winnerInfo || isBoardFull()) return;
+
+        const p = currentPlayer();
+        const linkOwner = (to === "eule") ? P1 : P2;
+        if (linkOwner !== p) return; // nicht dein Link / nicht dein Zug
+
+        const col = parseInt(e.currentTarget.dataset.col,10);
+        const row = findDropRow(col);
+        if (row === -1) return;
+
+        board[row][col] = p;
+        lastMove = {col,row,player:p};
+        const chip = getCellEl(col,row).querySelector(".chip");
+        chip.className = "chip " + (p===P1? "red":"yellow");
+        requestAnimationFrame(()=> chip.classList.add("show"));
+
+        winnerInfo = computeWinnerInfo(); paintBoard();
+        const full = isBoardFull();
+
+        // Nächster Link: m + Spalte, st bleibt, to wechselt zur Gegenseite
+        const nextMoves = movesStr + String(col);
+        const nextTo = (p===P1) ? "zebra" : "eule";
+        const link = makeLink(nextMoves, starter || "eule", nextTo);
+
+        disableInput();
+
+        if (winnerInfo || full){
+          $status.innerHTML = winnerInfo ? `Sieg! ${playerName(winnerInfo.player)} hat 4 in einer Linie.` : `Unentschieden – Brett voll.`;
+          $dot.className = "disc " + (winnerInfo ? (winnerInfo.player===P1? "red":"yellow") : "");
+          showShare(true, link); // Endzustand teilen
+        } else {
+          $status.innerHTML = `Zug gesetzt. Sende den Link an ${playerName(p===P1?P2:P1)}.`;
+          $dot.className = "disc " + (p===P1? "yellow":"red");
+          showShare(true, link);
+        }
+      }
+
+      function disableInput(){ Array.from($board.children).forEach(col=>col.classList.add("disabled")); }
+      function enableInput(){ Array.from($board.children).forEach(col=>col.classList.remove("disabled")); }
+
+      function showShare(show, link=""){
+        const share = $("#share-area");
+        share.style.display = show ? "block" : "none";
+        if (show){
+          $shareLink.value = link;
+          $("#btn-copy").onclick = async ()=>{ try{ await navigator.clipboard.writeText(link); $("#btn-copy").textContent="Kopiert ✅"; }catch(e){} };
+        }
+      }
+
+      function computeWinnerInfo(){
+        if (!lastMove) return null;
+        const {col,row,player} = lastMove;
+        const dirs=[{dc:1,dr:0},{dc:0,dr:1},{dc:1,dr:1},{dc:1,dr:-1}];
+        for(const d of dirs){
+          const line=collectLine(col,row,d.dc,d.dr,player);
+          if(line.length>=4){ return {player,line:line.slice(0,4)}; }
+        }
+        return null;
+      }
+      function collectLine(c,r,dc,dr,player){
+        const cells=[{c,r}];
+        let cc=c+dc,rr=r+dr;
+        while(inBounds(cc,rr)&&board[rr][cc]===player){ cells.push({c:cc,r:rr}); cc+=dc; rr+=dr; }
+        cc=c-dc; rr=r-dr;
+        while(inBounds(cc,rr)&&board[rr][cc]===player){ cells.unshift({c:cc,r:rr}); cc-=dc; rr-=dr; }
+        return cells;
+      }
+      function inBounds(c,r){ return c>=0&&c<COLS&&r>=0&&r<ROWS; }
+
+      $("#btn-new").addEventListener("click", ()=>{
+        // Basis-URL ohne Parameter -> Startscreen erscheint
+        location.href = baseUrl();
+      });
+    }
+  </script>
+</body>
+</html>
