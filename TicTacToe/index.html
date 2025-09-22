@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Tic Tac Toe – Eule vs. Zebra</title>
+  <style>
+    body{font-family:system-ui;background:#0b0f14;color:#e8eef7;display:grid;place-items:center;min-height:100vh;margin:0}
+    .wrap{background:#121823;padding:20px;border-radius:16px;max-width:400px;width:100%}
+    h1{text-align:center;font-size:20px;margin:0 0 16px}
+    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+    .cell{width:100px;height:100px;display:flex;align-items:center;justify-content:center;font-size:36px;
+      border:1px solid #ffffff22;cursor:pointer;border-radius:8px;background:#1a2332}
+    .cell.taken{cursor:not-allowed;opacity:.7}
+    .score{display:flex;justify-content:space-between;margin:10px 0;font-weight:bold}
+    .msg{text-align:center;margin:10px 0;font-size:16px}
+    button{margin-top:10px;padding:10px 14px;border:none;border-radius:8px;background:#6ee7ff;color:#000;font-weight:bold;cursor:pointer;width:100%}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🦉 Eule vs. 🦓 Zebra</h1>
+    <div id="score" class="score"></div>
+    <div id="msg" class="msg"></div>
+    <div id="board" class="board"></div>
+    <button id="reset">Neue Serie</button>
+  </div>
+
+  <script>
+    const $ = s => document.querySelector(s);
+
+    function parseQ(){
+      const q=new URLSearchParams(location.search);
+      return {
+        b: (q.get("b")||"........."), // 9 chars
+        t: q.get("t")||"x",
+        s1: parseInt(q.get("s1")||"0"),
+        s2: parseInt(q.get("s2")||"0"),
+      };
+    }
+
+    function linkTo(params){
+      const url=new URL(location.origin+location.pathname);
+      Object.entries(params).forEach(([k,v])=>{
+        if(v!=null) url.searchParams.set(k,v);
+      });
+      return url.toString();
+    }
+
+    function winner(b){
+      const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      for(const [a,c,d] of wins){
+        if(b[a]!=='.' && b[a]===b[c] && b[a]===b[d]) return b[a];
+      }
+      if(!b.includes(".")) return "draw";
+      return null;
+    }
+
+    function render(){
+      const {b,t,s1,s2}=parseQ();
+      const arr=b.split("");
+      const w=winner(arr);
+      $("#score").textContent=`🦉 Eule: ${s1}  |  🦓 Zebra: ${s2}`;
+      $("#msg").textContent = w==="x" ? "🦉 Eule gewinnt!"
+        : w==="o" ? "🦓 Zebra gewinnt!"
+        : w==="draw" ? "Unentschieden!" 
+        : (t==="x"?"🦉 Eule ist dran":"🦓 Zebra ist dran");
+
+      const board=$("#board");
+      board.innerHTML="";
+      arr.forEach((val,i)=>{
+        const div=document.createElement("div");
+        div.className="cell"+(val!=='.'?" taken":"");
+        div.textContent=val==="x"?"🦉":val==="o"?"🦓":"";
+        if(val==="." && !w){
+          div.onclick=()=>{
+            arr[i]=t;
+            let ns1=s1,ns2=s2;
+            const res=winner(arr);
+            if(res==="x") ns1++;
+            else if(res==="o") ns2++;
+            const nextTurn=(t==="x"?"o":"x");
+            const url=linkTo({b:arr.join(""),t:nextTurn,s1:ns1,s2:ns2});
+            navigator.clipboard.writeText(url).then(()=>alert("Link kopiert! Schick ihn deinem Mitspieler."));
+            location.href=url; // optional direkt aufrufen
+          };
+        }
+        board.appendChild(div);
+      });
+    }
+
+    $("#reset").onclick=()=>{
+      const url=linkTo({b:".........",t:"x",s1:0,s2:0});
+      location.href=url;
+    };
+
+    render();
+  </script>
+</body>
+</html>
