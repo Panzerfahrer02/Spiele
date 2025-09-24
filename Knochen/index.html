@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Knochen Lernspiel – Modus 1 + Skelett-Highlight</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#22d3ee; --active:#22d3ee; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Arial,"Apple Color Emoji","Segoe UI Emoji";background:radial-gradient(1200px 600px at 10% -10%,#1f2937 5%,var(--bg) 55%);color:var(--text);min-height:100vh;display:grid;place-items:start center}
+    .wrap{width:min(1200px,100%);padding:24px}
+    header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .title{font-size:clamp(20px,2.8vw,32px);font-weight:800;letter-spacing:.3px}
+    .subtitle{color:var(--muted);font-size:14px}
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .controls{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px}
+    @media (min-width:1100px){.controls{grid-template-columns:1.2fr 1fr}} 
+    .control-group{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+    .control-group h3{margin:0 8px 0 0;font-size:14px;color:var(--muted);font-weight:600}
+    .segmented{display:inline-flex;background:#0b1220;border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden}
+    .segmented input{display:none}
+    .segmented label{padding:8px 12px;cursor:pointer;font-size:14px;color:var(--muted)}
+    .segmented input:checked+label{background:rgba(34,211,238,.12);color:var(--text)}
+    .regions{display:flex;flex-wrap:wrap;gap:6px}
+    .tag{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.08);padding:6px 10px;border-radius:10px;background:#0b1220}
+    .tag input{accent-color:var(--accent)}
+    .btn{background:#0ea5a5;color:black;border:none;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .btn.secondary{background:#374151;color:var(--text)}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.12);color:var(--text)}
+    .game{margin-top:12px;display:grid;gap:14px}
+    .prompt{font-size:clamp(18px,2.2vw,26px);font-weight:800;letter-spacing:.2px}
+    input[type="text"]{width:100%;background:#0b1220;color:var(--text);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 14px;font-size:16px;outline:none}
+    input.ok{border-color:rgba(52,211,153,.6);box-shadow:0 0 0 4px rgba(52,211,153,.15) inset}
+    input.bad{border-color:rgba(248,113,113,.6);box-shadow:0 0 0 4px rgba(248,113,113,.15) inset}
+    .meta{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:13px}
+    .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .stat{background:#0b1220;border:1px solid rgba(255,255,255,.08);padding:10px;border-radius:12px;text-align:center}
+    .stat b{font-size:18px;display:block}
+    .badge{font-size:12px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 8px;color:var(--muted)}
+    .list{display:grid;gap:8px}
+    details{background:#0b1220;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 10px}
+    summary{cursor:pointer;font-weight:700}
+    footer{margin-top:24px;color:var(--muted);font-size:12px;text-align:center}
+
+    /* —— Skeleton viewer —— */
+    .grid {display:grid;gap:16px}
+    @media (min-width:1100px){.grid{grid-template-columns:1fr 420px}}
+    .skeleton-panel{display:grid;gap:8px}
+    .skeleton-wrap{background:#0b1220;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:12px;display:grid;place-items:center}
+    svg.skeleton{width:100%;max-width:380px;height:auto}
+    .bone{fill:rgba(255,255,255,.05);stroke:rgba(255,255,255,.15);stroke-width:1}
+    .bone:hover{filter:brightness(1.2)}
+    .bone.active{fill:rgba(34,211,238,.22);stroke:var(--active);stroke-width:2}
+    .legend{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="title">🦴 Knochen Lernspiel – Modus 1</div>
+        <div class="subtitle">Deutsch ⟷ Latein · Tippen · Wiederholen bis korrekt · Regionen-Filter · Skelett-Highlight</div>
+      </div>
+      <div class="badge">Groß/Kleinschreibung egal</div>
+      <div class="badge">Umlaute/Diakritika tolerant</div>
+      <div class="badge">Keine Duplikate</div>
+    </header>
+
+    <section class="panel">
+      <div class="controls">
+        <div class="control-group">
+          <h3>Richtung</h3>
+          <div class="segmented" role="tablist" aria-label="Richtung wählen">
+            <input type="radio" name="dir" id="dirGL" value="g2l" checked><label for="dirGL">DE → LA</label>
+            <input type="radio" name="dir" id="dirLG" value="l2g"><label for="dirLG">LA → DE</label>
+            <input type="radio" name="dir" id="dirMix" value="mix"><label for="dirMix">Mix</label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <h3>Regionen</h3>
+          <label class="tag" id="allBox"><input type="checkbox" id="toggleAll" checked> Alle Knochen</label>
+          <div id="regionBox" class="regions"></div>
+        </div>
+
+        <div class="control-group">
+          <h3>Optionen</h3>
+          <label class="tag"><input type="checkbox" id="onlyMajor"> Nur Hauptknochen</label>
+          <label class="tag"><input type="checkbox" id="bundleTerms" checked> Begriffe zusammenfassen</label>
+          <label class="tag"><input type="checkbox" id="shuffleOnStart" checked> Zufällige Reihenfolge</label>
+          <label class="tag"><input type="checkbox" id="skeletonHighlight" checked> Skelett hervorheben</label>
+          <button class="btn" id="startBtn">Training starten ▶</button>
+          <button class="btn ghost" id="resetBtn">Zurücksetzen</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div>
+          <div class="game" id="game" hidden>
+            <div class="stats">
+              <div class="stat"><span>Gesamt</span><b id="total">0</b></div>
+              <div class="stat"><span>Richtig</span><b id="correct">0</b></div>
+              <div class="stat"><span>Offen</span><b id="remaining">0</b></div>
+            </div>
+
+            <div class="card">
+              <div class="prompt" id="prompt">—</div>
+              <div class="iwrap"><input type="text" id="answer" placeholder="Antwort eingeben und Enter drücken …" autocomplete="off" /></div>
+              <div class="meta" id="meta"></div>
+              <div>
+                <button class="btn" id="checkBtn">Prüfen ⏎</button>
+                <button class="btn secondary" id="skipBtn">Überspringen ↷</button>
+                <button class="btn ghost" id="revealBtn">Lösung zeigen</button>
+              </div>
+            </div>
+
+            <details id="recap" open>
+              <summary>Verlauf & Wiederholungen</summary>
+              <div class="list" id="history"></div>
+            </details>
+          </div>
+        </div>
+
+        <div class="skeleton-panel">
+          <div class="legend">Wenn ein Knochen abgefragt wird, wird er im Skelett hervorgehoben.</div>
+          <div class="skeleton-wrap">
+            <!-- Simplified anterior SVG skeleton. IDs correspond to groups used for highlighting. -->
+            <svg class="skeleton" viewBox="0 0 200 480" aria-label="Skelett Vorderansicht">
+              <!-- Kopf / Schädel -->
+              <g id="skull" class="bone"><ellipse cx="100" cy="40" rx="26" ry="22"/></g>
+              <g id="mandible" class="bone"><path d="M76 55 Q100 72 124 55 Q120 70 100 78 Q80 70 76 55 Z"/></g>
+              <g id="hyoid" class="bone"><rect x="92" y="86" width="16" height="4" rx="2"/></g>
+
+              <!-- Wirbelsäule -->
+              <g id="spine-cerv" class="bone"><rect x="96" y="92" width="8" height="32" rx="3"/></g>
+              <g id="spine-thor" class="bone"><rect x="94" y="124" width="12" height="64" rx="4"/></g>
+              <g id="spine-lumb" class="bone"><rect x="94" y="188" width="12" height="40" rx="4"/></g>
+              <g id="sacrum" class="bone"><rect x="92" y="228" width="16" height="18" rx="4"/></g>
+              <g id="coccyx" class="bone"><rect x="98" y="248" width="4" height="10" rx="2"/></g>
+
+              <!-- Thorax -->
+              <g id="sternum" class="bone"><rect x="102" y="128" width="8" height="50" rx="3" transform="translate(-6,0)"/></g>
+              <g id="ribs-L" class="bone"><path d="M94 130 C60 138,60 170,94 176 M94 140 C62 148,62 176,94 182 M94 150 C64 158,64 182,94 188"/></g>
+              <g id="ribs-R" class="bone"><path d="M106 130 C140 138,140 170,106 176 M106 140 C138 148,138 176,106 182 M106 150 C136 158,136 182,106 188"/></g>
+
+              <!-- Schultergürtel -->
+              <g id="clavicle-L" class="bone"><path d="M92 116 C72 110,60 110,52 116"/></g>
+              <g id="clavicle-R" class="bone"><path d="M108 116 C128 110,140 110,148 116"/></g>
+              <g id="scapula-L" class="bone"><path d="M54 126 L42 146 L60 150 Z"/></g>
+              <g id="scapula-R" class="bone"><path d="M146 126 L158 146 L140 150 Z"/></g>
+
+              <!-- Arme -->
+              <g id="humerus-L" class="bone"><rect x="56" y="150" width="12" height="60" rx="6"/></g>
+              <g id="humerus-R" class="bone"><rect x="132" y="150" width="12" height="60" rx="6"/></g>
+              <g id="ulna-L" class="bone"><rect x="50" y="210" width="10" height="56" rx="4"/></g>
+              <g id="radius-L" class="bone"><rect x="64" y="210" width="10" height="56" rx="4"/></g>
+              <g id="ulna-R" class="bone"><rect x="140" y="210" width="10" height="56" rx="4"/></g>
+              <g id="radius-R" class="bone"><rect x="126" y="210" width="10" height="56" rx="4"/></g>
+              <g id="hand-L" class="bone"><rect x="48" y="266" width="28" height="20" rx="4"/></g>
+              <g id="hand-R" class="bone"><rect x="124" y="266" width="28" height="20" rx="4"/></g>
+
+              <!-- Becken -->
+              <g id="pelvis-L" class="bone"><path d="M82 232 C66 232 60 246 66 260 C76 262 82 252 84 244 Z"/></g>
+              <g id="pelvis-R" class="bone"><path d="M118 232 C134 232 140 246 134 260 C124 262 118 252 116 244 Z"/></g>
+
+              <!-- Beine -->
+              <g id="femur-L" class="bone"><rect x="84" y="264" width="12" height="82" rx="6"/></g>
+              <g id="femur-R" class="bone"><rect x="104" y="264" width="12" height="82" rx="6"/></g>
+              <g id="patella-L" class="bone"><rect x="86" y="346" width="8" height="8" rx="2"/></g>
+              <g id="patella-R" class="bone"><rect x="106" y="346" width="8" height="8" rx="2"/></g>
+              <g id="tibia-L" class="bone"><rect x="84" y="356" width="10" height="80" rx="5"/></g>
+              <g id="fibula-L" class="bone"><rect x="96" y="356" width="6" height="80" rx="3"/></g>
+              <g id="tibia-R" class="bone"><rect x="104" y="356" width="10" height="80" rx="5"/></g>
+              <g id="fibula-R" class="bone"><rect x="116" y="356" width="6" height="80" rx="3"/></g>
+              <g id="foot-L" class="bone"><rect x="76" y="436" width="34" height="14" rx="4"/></g>
+              <g id="foot-R" class="bone"><rect x="110" y="436" width="34" height="14" rx="4"/></g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>Neu: Skelett-Abbildung mit automatischer Hervorhebung des abgefragten Knochens. ✨</footer>
+  </div>
+
+  <!-- ====== Datengenerator (206 Knochen) aus a.txt – unverändert (leicht angepasst) ====== -->
+  <script>
+  function sideLabel(de, side){return `${de} (${side})`;}
+  function idWithSide(id, side){return `${id}-${side==='links'?'sin':'dex'}`;}
+  function roman(n){return ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][n-1];}
+  function buildBones(){
+    const out=[];
+    const skullSingles=[['os-frontale','Stirnbein','Os frontale'],['os-occipitale','Hinterhauptbein','Os occipitale'],['os-sphenoidale','Keilbein','Os sphenoidale'],['os-ethmoidale','Siebbein','Os ethmoidale'],['vomer','Pflugscharbein','Vomer'],['mandibula','Unterkiefer','Mandibula']];
+    skullSingles.forEach(([id,de,la])=>out.push({id,de,la,regions:['Schädel'],major:true}));
+    const skullPaired=[['os-parietale','Scheitelbein','Os parietale'],['os-temporale','Schläfenbein','Os temporale'],['maxilla','Oberkiefer','Maxilla'],['os-zygomaticum','Jochbein','Os zygomaticum'],['os-nasale','Nasenbein','Os nasale'],['os-lacrimale','Tränenbein','Os lacrimale'],['os-palatine','Gaumenbein','Os palatinum'],['concha-nasalis-inferior','Untere Nasenmuschel','Concha nasalis inferior']];
+    ['links','rechts'].forEach(s=>skullPaired.forEach(([id,de,la])=>out.push({id:idWithSide(id,s),de:sideLabel(de,s),la,regions:['Schädel']})));
+    out.push({id:'os-hyoideum',de:'Zungenbein',la:'Os hyoideum',regions:['Hals']});
+    const oss=[['malleus','Hammer','Malleus'],['incus','Amboss','Incus'],['stapes','Steigbügel','Stapes']];
+    ['links','rechts'].forEach(s=>oss.forEach(([id,de,la])=>out.push({id:idWithSide(id,s),de:sideLabel(de,s),la,regions:['Ohr']})));
+    for(let i=1;i<=7;i++){const id=i===1?'atlas':(i===2?'axis':`c${i}`),de=i===1?'Atlas':(i===2?'Axis':`Halswirbel C${i}`),la=i===1?'Atlas':(i===2?'Axis':`Vertebra cervicalis ${roman(i)}`);out.push({id:`vertebra-cerv-${id}`,de,la,regions:['Wirbelsäule'],major:true});}
+    for(let i=1;i<=12;i++) out.push({id:`vertebra-thor-${i}`,de:`Brustwirbel T${i}`,la:`Vertebra thoracica ${roman(i)}`,regions:['Wirbelsäule']});
+    for(let i=1;i<=5;i++) out.push({id:`vertebra-lumb-${i}`,de:`Lendenwirbel L${i}`,la:`Vertebra lumbalis ${roman(i)}`,regions:['Wirbelsäule']});
+    out.push({id:'os-sacrum',de:'Kreuzbein',la:'Os sacrum',regions:['Wirbelsäule','Becken'],major:true});
+    out.push({id:'os-coccygis',de:'Steißbein',la:'Os coccygis',regions:['Wirbelsäule','Becken']});
+    out.push({id:'sternum',de:'Brustbein',la:'Sternum',regions:['Thorax'],major:true});
+    ['links','rechts'].forEach(s=>{for(let i=1;i<=12;i++) out.push({id:`costa-${roman(i)}-${s==='links'?'sin':'dex'}`,de:`Rippe ${roman(i)} (${s})`,la:`Costa ${roman(i)}`,regions:['Thorax']})});
+    ['links','rechts'].forEach(s=>{out.push({id:idWithSide('clavicula',s),de:sideLabel('Schlüsselbein',s),la:'Clavicula',regions:['Schultergürtel']});out.push({id:idWithSide('scapula',s),de:sideLabel('Schulterblatt',s),la:'Scapula',regions:['Schultergürtel']});});
+    ['links','rechts'].forEach(s=>{
+      out.push({id:idWithSide('humerus',s),de:sideLabel('Oberarmknochen',s),la:'Humerus',regions:['Obere Extremität'],major:true});
+      out.push({id:idWithSide('ulna',s),de:sideLabel('Elle',s),la:'Ulna',regions:['Obere Extremität'],major:true});
+      out.push({id:idWithSide('radius',s),de:sideLabel('Speiche',s),la:'Radius',regions:['Obere Extremität'],major:true});
+      [['os-scaphoideum','Kahnbein','Os scaphoideum'],['os-lunatum','Mondbein','Os lunatum'],['os-triquetrum','Dreiecksbein','Os triquetrum'],['os-pisiforme','Erbsenbein','Os pisiforme'],['os-trapezium','Großes Vieleckbein','Os trapezium'],['os-trapezoideum','Kleines Vieleckbein','Os trapezoideum'],['os-capitatum','Kopfbein','Os capitatum'],['os-hamatum','Hakenbein','Os hamatum']].forEach(([id,de,la])=>out.push({id:idWithSide(id,s),de:sideLabel(de,s),la,regions:['Hand']}));
+      for(let i=1;i<=5;i++) out.push({id:`metacarpale-${roman(i)}-${s==='links'?'sin':'dex'}`,de:`Mittelhandknochen ${roman(i)} (${s})`,la:`Os metacarpale ${roman(i)}`,regions:['Hand']});
+      for(let d=1;d<=5;d++){
+        out.push({id:`phalanx-prox-manus-${roman(d)}-${s==='links'?'sin':'dex'}`,de:`Grundglied Finger ${roman(d)} (${s})`,la:`Phalanx proximalis digiti ${roman(d)} manus`,regions:['Hand']});
+        if(d!==1) out.push({id:`phalanx-media-manus-${roman(d)}-${s==='links'?'sin':'dex'}`,de:`Mittelglied Finger ${roman(d)} (${s})`,la:`Phalanx media digiti ${roman(d)} manus`,regions:['Hand']});
+        out.push({id:`phalanx-dist-manus-${roman(d)}-${s==='links'?'sin':'dex'}`,de:`Endglied Finger ${roman(d)} (${s})`,la:`Phalanx distalis digiti ${roman(d)} manus`,regions:['Hand']});
+      }
+    });
+    ['links','rechts'].forEach(s=>out.push({id:idWithSide('os-coxae',s),de:sideLabel('Hüftbein',s),la:'Os coxae',regions:['Becken'],major:true}));
+    ['links','rechts'].forEach(s=>{
+      out.push({id:idWithSide('femur',s),de:sideLabel('Oberschenkelknochen',s),la:'Femur',regions:['Untere Extremität'],major:true});
+      out.push({id:idWithSide('patella',s),de:sideLabel('Kniescheibe',s),la:'Patella',regions:['Untere Extremität'],major:true});
+      out.push({id:idWithSide('tibia',s),de:sideLabel('Schienbein',s),la:'Tibia',regions:['Untere Extremität'],major:true});
+      out.push({id:idWithSide('fibula',s),de:sideLabel('Wadenbein',s),la:'Fibula',regions:['Untere Extremität'],major:true});
+      [['talus','Sprungbein','Talus'],['calcaneus','Fersenbein','Calcaneus'],['os-naviculare','Kahnbein (Fuß)','Os naviculare'],['os-cuboideum','Würfelbein','Os cuboideum'],['os-cuneiforme-mediale','Erstes Keilbein','Os cuneiforme mediale'],['os-cuneiforme-intermedium','Zweites Keilbein','Os cuneiforme intermedium'],['os-cuneiforme-laterale','Drittes Keilbein','Os cuneiforme laterale']].forEach(([id,de,la])=>out.push({id:idWithSide(id,s),de:sideLabel(de,s),la,regions:['Fuß']}));
+      for(let i=1;i<=5;i++) out.push({id:`metatarsale-${roman(i)}-${s==='links'?'sin':'dex'}`,de:`Mittelfußknochen ${roman(i)} (${s})`,la:`Os metatarsale ${roman(i)}`,regions:['Fuß']});
+      for(let d=1;d<=5;d++){
+        out.push({id:`phalanx-prox-pedis-${roman(d)}-${s==='links'?'sin':'dex'}`,de:`Grundglied Zehe ${roman(d)} (${s})`,la:`Phalanx proximalis digiti ${roman(d)} pedis`,regions:['Fuß']});
+        if(d!==1) out.push({id:`phalanx-media-pedis-${roman(d)}-${s==='links'?'sin':'dex'}`,de:`Mittelglied Zehe ${roman(d)} (${s})`,la:`Phalanx media digiti ${roman(d)} pedis`,regions:['Fuß']});
+        out.push({id:`phalanx-dist-pedis-${roman(d)}-${s==='links'?'sin':'dex'}`,de:`Endglied Zehe ${roman(d)} (${s})`,la:`Phalanx distalis digiti ${roman(d)} pedis`,regions:['Fuß']});
+      }
+    });
+    return out;
+  }
+  const BONES = buildBones();
+  const REGIONS = ['Schädel','Hals','Ohr','Wirbelsäule','Thorax','Schultergürtel','Obere Extremität','Hand','Becken','Untere Extremität','Fuß'];
+  </script>
+
+  <!-- ====== UI/Engine + Zusammenfassungslogik & Zähler + Skelett-Highlight ====== -->
+  <script>
+  const $ = s=>document.querySelector(s), $$ = s=>Array.from(document.querySelectorAll(s));
+  const normalize = s => (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}+/gu,'').replace(/\s+/g,' ');
+  const ROM = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+  function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+  // —— Zusammenfassen: Seiten + Phalanx-Serien ——
+  const SIDE_RE = /\s\((links|rechts)\)$/i;
+  function stripSide(s){return s.replace(SIDE_RE,'');}
+  function bundleCanon(b){
+    let de = stripSide(b.de);
+    let la = b.la;
+    la = la.replace(/(Phalanx (?:proxima|media|distali)s) digiti (II|III|IV|V) (manus|pedis)/g, '$1 digitorum II–V $3');
+    de = de.replace(/(Grundglied|Mittelglied|Endglied)\s(Finger|Zehe)\s(II|III|IV|V)/g, '$1 $2 II–V');
+    return {de, la};
+  }
+  function dedupBones(bones){
+    if(!$('#bundleTerms').checked) return bones.slice();
+    const map = new Map();
+    bones.forEach(b=>{
+      const canon = bundleCanon(b);
+      const key = `${canon.de}|${canon.la}`;
+      if(!map.has(key)){
+        map.set(key, { ...b, de: canon.de, la: canon.la, regions: new Set(b.regions) });
+      }else{
+        const prev = map.get(key);
+        canon.de !== prev.de && (prev.de = canon.de);
+        prev.regions = new Set([...prev.regions, ...b.regions]);
+        prev.major = prev.major || b.major;
+      }
+    });
+    return Array.from(map.values()).map(x=>({ ...x, regions: Array.from(x.regions) }));
+  }
+
+  // —— Regionen-UI mit Zählern ——
+  function regionCountsForDisplay(){
+    const bundled = dedupBones(BONES);
+    const counts = {};
+    REGIONS.forEach(r=>counts[r]=bundled.filter(b=>b.regions.includes(r)).length);
+    return counts;
+  }
+  function buildRegionFilters(){
+    const counts = regionCountsForDisplay();
+    const box = $('#regionBox');
+    box.innerHTML = '';
+    REGIONS.forEach(r=>{
+      const id = 'region-'+r.replace(/\s+/g,'-');
+      const label = `${r} (${counts[r]||0})`;
+      const el = document.createElement('label');
+      el.className='tag';
+      el.innerHTML = `<input type="checkbox" id="${id}" data-region="${r}" checked> ${label}`;
+      box.appendChild(el);
+    });
+    $('#toggleAll').checked = true;
+  }
+
+  // —— Auswahlen & Filter ——
+  function getDirection(){ return $$('input[name="dir"]').find(i=>i.checked).value; }
+  function selectedRegions(){
+    const boxes = $$('#regionBox input[type="checkbox"]');
+    const r = boxes.filter(b=>b.checked).map(b=>b.dataset.region);
+    return r.length ? r : REGIONS;
+  }
+  function filterBonesBase(){
+    const regions = new Set(selectedRegions());
+    const majorOnly = $('#onlyMajor').checked;
+    return BONES.filter(b => b.regions.some(r=>regions.has(r)) && (!majorOnly || b.major));
+  }
+  function currentPool(){
+    const base = filterBonesBase();
+    return dedupBones(base);
+  }
+
+  // —— Zähler-Update in Regionenlabels, wenn Optionen wechseln ——
+  function refreshRegionLabelsCounts(){
+    const counts = regionCountsForDisplay();
+    $$('#regionBox label').forEach(lbl=>{
+      const cb = lbl.querySelector('input');
+      const r = cb.dataset.region;
+      lbl.lastChild.nodeValue = ` ${r} (${counts[r]||0})`;
+    });
+  }
+
+  // —— Queue/Engine ——
+  let queue=[], current=null, stats={total:0,correct:0}, history=[];
+  function makeItems(direction){
+    const bones = currentPool();
+    const items = bones.map(b=>{
+      const dir = direction==='mix' ? (Math.random()<0.5?'g2l':'l2g') : direction;
+      return { bone:b, ask: dir==='g2l'?'la':'de', tries:0, wasWrong:false };
+    });
+    return $('#shuffleOnStart').checked ? shuffle(items) : items;
+  }
+  function updateStats(){
+    $('#total').textContent = stats.total;
+    const rem = (current?1:0) + queue.length;
+    $('#remaining').textContent = rem;
+    $('#correct').textContent = stats.correct;
+  }
+  function currentPrompt(it){
+    const b = it.bone;
+    return it.ask==='la' ? `Übersetze ins Lateinische: “${b.de}”` : `Übersetze ins Deutsche: “${b.la}”`;
+  }
+  function expectedAnswers(it){
+    const b = it.bone;
+    const list = it.ask==='la' ? [b.la].concat(b.laSyn||[]) : [b.de].concat(b.deSyn||[]);
+    return list.map(normalize);
+  }
+
+  // —— Skelett-Highlight ——
+  const ACTIVE_CLASS = 'active';
+  function sideFromId(id){ const m = id.match(/-(sin|dex)$/); return m? (m[1]==='sin'?'L':'R') : null; }
+  function baseId(id){ return id.replace(/-(sin|dex)$/,''); }
+  function ribIndexFromId(id){ const m = id.match(/^costa-([IVXLCDM]+)-(sin|dex)$/); return m? m[1] : null; }
+
+  // Map File-IDs → SVG-IDs (prefix plus side where relevant)
+  function svgTargetsForBone(b){
+    const id = b.id;
+    const side = sideFromId(id); // 'L' | 'R' | null
+    const base = baseId(id);
+    const targets = [];
+
+    const add = (t)=>{ if(Array.isArray(t)) t.forEach(add); else if(t) targets.push(t); };
+
+    const midline = {
+      'mandibula':'mandible',
+      'os-frontale':'skull','os-occipitale':'skull','os-sphenoidale':'skull','os-ethmoidale':'skull','vomer':'skull',
+      'os-hyoideum':'hyoid','sternum':'sternum','os-sacrum':'sacrum','os-coccygis':'coccyx',
+    };
+    if(midline[base]){ add(midline[base]); return targets; }
+
+    // Wirbel
+    if(base.startsWith('vertebra-cerv-')){ add('spine-cerv'); return targets; }
+    if(base.startsWith('vertebra-thor-')){ add('spine-thor'); return targets; }
+    if(base.startsWith('vertebra-lumb-')){ add('spine-lumb'); return targets; }
+
+    // Rippen
+    if(ribIndexFromId(id)){ add('ribs-'+(side||'L')); return targets; }
+
+    // Schultergürtel / Arme
+    const paired = {
+      'clavicula':'clavicle','scapula':'scapula','humerus':'humerus','ulna':'ulna','radius':'radius','hand':'hand',
+      'os-coxae':'pelvis','femur':'femur','patella':'patella','tibia':'tibia','fibula':'fibula','foot':'foot'
+    };
+    if(paired[base]){ add(paired[base]+'-'+(side||'L')); return targets; }
+
+    // Hände: Karpalia / Metakarpalia / Phalangen → "hand"
+    if(base.startsWith('os-') && (b.regions||[]).includes('Hand')){ add('hand-'+(side||'L')); return targets; }
+    if(base.startsWith('metacarpale')){ add('hand-'+(side||'L')); return targets; }
+    if(base.startsWith('phalanx-') && (b.regions||[]).includes('Hand')){ add('hand-'+(side||'L')); return targets; }
+
+    // Füße: Tarsalia / Metatarsalia / Phalangen → "foot"
+    if(base.startsWith('os-') && (b.regions||[]).includes('Fuß')){ add('foot-'+(side||'L')); return targets; }
+    if(base.startsWith('metatarsale')){ add('foot-'+(side||'L')); return targets; }
+    if(base.startsWith('phalanx-') && (b.regions||[]).includes('Fuß')){ add('foot-'+(side||'L')); return targets; }
+
+    // Schädel-Teile (paarig) → skull
+    const skullPairedBases = ['os-parietale','os-temporale','maxilla','os-zygomaticum','os-nasale','os-lacrimale','os-palatine','concha-nasalis-inferior'];
+    if(skullPairedBases.includes(base)){ add('skull'); return targets; }
+
+    // Fallback: Region → Gruppe
+    const reg = (b.regions||[]);
+    if(reg.includes('Schultergürtel')) add('clavicle-'+(side||'L'));
+    else if(reg.includes('Obere Extremität')) add('humerus-'+(side||'L'));
+    else if(reg.includes('Untere Extremität')) add('femur-'+(side||'L'));
+    else if(reg.includes('Thorax')) add('sternum');
+    else if(reg.includes('Wirbelsäule')) add('spine-thor');
+    return targets;
+  }
+  function clearHighlights(){ $$('.bone').forEach(el=>el.classList.remove(ACTIVE_CLASS)); }
+  function highlightBone(b){
+    clearHighlights();
+    if(!$('#skeletonHighlight').checked) return;
+    const ids = svgTargetsForBone(b);
+    ids.forEach(id=>{ const el = document.getElementById(id); if(el) el.classList.add(ACTIVE_CLASS); });
+  }
+
+  function next(){
+    current = queue.shift()||null;
+    $('#history').innerHTML = history.map(h=>`<div>• <span class="answer">${h.asked}</span> → <span class="answer">${h.answered||'—'}</span> ${h.ok?'✅':'❌'}</div>`).join('');
+    if(!current){
+      $('#prompt').textContent='Fertig! 🎉 Alles korrekt beantwortet.';
+      $('#answer').value=''; ['answer','checkBtn','skipBtn','revealBtn'].forEach(id=>$('#'+id).disabled=true);
+      $('#meta').innerHTML='<span>Du kannst ein neues Training starten.</span>'; updateStats(); clearHighlights(); return;
+    }
+    $('#prompt').textContent=currentPrompt(current);
+    ['answer','checkBtn','skipBtn','revealBtn'].forEach(id=>$('#'+id).disabled=false);
+    $('#answer').value=''; $('#answer').focus(); updateStats();
+    highlightBone(current.bone);
+  }
+
+  function start(){
+    queue = makeItems(getDirection());
+    stats = { total: queue.length, correct: 0 };
+    history = [];
+    $('#game').hidden=false; $('#recap').open=true; updateStats(); next();
+  }
+  function check(){
+    const input = normalize($('#answer').value);
+    const ok = expectedAnswers(current).includes(input);
+    const askedStr = current.ask==='la' ? current.bone.de : current.bone.la;
+    history.push({ id: current.bone.id, asked: askedStr, answered: $('#answer').value.trim(), ok });
+    if(ok){ $('#answer').classList.add('ok'); setTimeout(()=>$('#answer').classList.remove('ok'),400); if(!current.wasWrong) stats.correct++; next();
+    }else{ $('#answer').classList.add('bad'); setTimeout(()=>$('#answer').classList.remove('bad'),400); current.wasWrong=true; current.tries++; queue.push(current); const exp = expectedAnswers(current)[0]; $('#meta').innerHTML=`Tipp: Beginnt mit <b class="answer">${exp.split(' ')[0]}</b>`; next(); }
+    updateStats();
+  }
+  function skip(){ queue.push(current); next(); }
+  function reveal(){
+    const sol = current.ask==='la' ? current.bone.la : current.bone.de;
+    $('#meta').innerHTML=`Lösung: <b class="answer">${sol}</b>`;
+    $('#answer').focus();
+  }
+  function resetAll(){ queue=[]; current=null; stats={total:0,correct:0}; history=[]; $('#game').hidden=true; $('#answer').value=''; $('#meta').innerHTML=''; clearHighlights(); }
+
+  // —— Bootstrap & Events ——
+  function wireRegionEvents(){
+    $('#toggleAll').addEventListener('change', e=>{
+      const on = e.target.checked;
+      $$('#regionBox input[type="checkbox"]').forEach(cb=>cb.checked=on);
+    });
+    $('#regionBox').addEventListener('change', e=>{
+      if(e.target.matches('input[type="checkbox"])')){
+        const boxes = $$('#regionBox input[type="checkbox"]');
+        $('#toggleAll').checked = boxes.every(b=>b.checked);
+      }
+    });
+  }
+  function refreshRegionsUI(){ buildRegionFilters(); wireRegionEvents(); }
+  refreshRegionsUI();
+  $('#bundleTerms').addEventListener('change', ()=>{ refreshRegionsUI(); });
+  $('#startBtn').addEventListener('click', start);
+  $('#resetBtn').addEventListener('click', resetAll);
+  $('#checkBtn').addEventListener('click', check);
+  $('#skipBtn').addEventListener('click', skip);
+  $('#revealBtn').addEventListener('click', reveal);
+  $('#answer').addEventListener('keydown', e=>{ if(e.key==='Enter') check(); });
+  </script>
+</body>
+</html>
