@@ -1,231 +1,462 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Tic Tac Toe – Tier-Duell</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dobble – Zeit-Duell (ohne Server)</title>
   <style>
-    body{font-family:system-ui;background:#0b0f14;color:#e8eef7;display:grid;place-items:center;min-height:100vh;margin:0;padding:20px}
-    .wrap{background:#121823;padding:20px;border-radius:16px;max-width:440px;width:100%;border:1px solid rgba(255,255,255,.08)}
-    h1{text-align:center;font-size:20px;margin:0 0 12px}
-    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
-    .cell{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:42px;
-      border:1px solid #ffffff22;cursor:pointer;border-radius:10px;background:#1a2332}
-    .cell.taken{cursor:not-allowed;opacity:.7}
-    .score{display:flex;justify-content:space-between;margin:10px 0;font-weight:bold;gap:10px;flex-wrap:wrap}
-    .msg{text-align:center;margin:10px 0;font-size:16px}
-    button{margin-top:10px;padding:10px 14px;border:none;border-radius:10px;background:#6ee7ff;color:#000;font-weight:bold;cursor:pointer;width:100%}
-    .pick{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+    :root{
+      --bg:#0b0f14; --card:#121823; --ink:#e8eef7; --muted:#9bb0c5;
+      --accent:#6ee7ff; --good:#3de0a4; --bad:#ff6b6b; --warn:#ffd166;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
+      background:radial-gradient(1100px 700px at 15% 0%,#13253b,var(--bg));color:var(--ink);
+      display:grid;place-items:center;min-height:100svh;padding:20px
+    }
+    .wrap{width:100%;max-width:980px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+    h1{margin:0;font-size:20px}
+    button{
+      appearance:none;border:1px solid rgba(255,255,255,.15);
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+      color:var(--ink);padding:10px 12px;border-radius:12px;cursor:pointer
+    }
+    button:hover{border-color:rgba(255,255,255,.28)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+    .status{
+      display:flex;justify-content:space-between;align-items:center;gap:10px;
+      background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
+      border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:12px 14px;margin-bottom:12px;
+      flex-wrap:wrap;
+    }
+    .pill{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)}
+    .timer{font-variant-numeric:tabular-nums}
+
+    /* Runde Karten */
+    .cards{
+      display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:16px;min-height:280px
+    }
+    .card{
+      position:relative; aspect-ratio:1/1; border-radius:50%;
+      background:radial-gradient(120% 120% at 30% 25%, #1d2c43 0%, #0f1827 60%, #0b111c 100%);
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow:0 10px 35px rgba(0,0,0,.35), inset 0 2px 8px rgba(255,255,255,.05);
+      overflow:hidden; transform:rotate(0.0001deg);
+    }
+    .ring{
+      position:absolute; inset:10px; border-radius:50%;
+      border:2px dashed rgba(255,255,255,.065);
+      box-shadow:inset 0 0 40px rgba(0,0,0,.35);
+      pointer-events:none;
+    }
+
+    .symbol{
+      position:absolute; display:grid; place-items:center;
+      line-height:1; user-select:none; cursor:pointer; border-radius:12px;
+      transform:translate(-50%,-50%);
+      transition:transform .12s ease, filter .12s ease, box-shadow .12s ease, opacity .12s ease;
+      will-change:transform,filter;
+    }
+    .symbol:hover{ transform:translate(-50%,-50%) translateY(-2px) scale(1.04); filter:brightness(1.05) }
+    .symbol.disabled{ pointer-events:none; opacity:.65 }
+    .symbol.correct{
+      box-shadow:0 0 0 3px var(--good), 0 0 30px rgba(61,224,164,.25);
+      border-radius:16px;
+    }
+    .symbol.wrong{ animation:shake .25s ease }
+    @keyframes shake{
+      0%{transform:translate(-50%,-50%) translateX(0)}
+      25%{transform:translate(-50%,-50%) translateX(-4px)}
+      50%{transform:translate(-50%,-50%) translateX(4px)}
+      75%{transform:translate(-50%,-50%) translateX(-3px)}
+      100%{transform:translate(-50%,-50%) translateX(0)}
+    }
+
+    .flipcover{
+      position:absolute; inset:0; border-radius:50%;
+      background:radial-gradient(120% 120% at 40% 20%, #0f1726 0%, #0b0f14 70%);
+      display:grid; place-items:center; font-size:64px; font-weight:700; letter-spacing:.5px;
+      color:#e8eef7; text-shadow:0 2px 12px rgba(0,0,0,.6);
+    }
+    .hidden{display:none}
+
+    .help{font-size:13px;color:var(--muted);margin-top:8px}
+    textarea.linkbox{
+      width:100%;min-height:74px;border-radius:12px;border:1px solid rgba(255,255,255,.15);
+      background:rgba(255,255,255,.04);color:var(--ink);padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
+    }
+    .lead{color:var(--accent)}
+
+    /* ✅ Tier-Auswahl */
     select{
       border:1px solid rgba(255,255,255,.15);
       background:rgba(255,255,255,.04);
-      color:#e8eef7;
-      padding:10px 12px;
+      color:var(--ink);
+      padding:8px 10px;
       border-radius:12px;
       font-size:14px;
       outline:none;
-      width:100%;
     }
-    .pill{
-      flex:1; min-width:190px;
-      border:1px solid rgba(255,255,255,.12);
+    .pick{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
       background:rgba(255,255,255,.03);
-      padding:10px 10px;
+      border:1px solid rgba(255,255,255,.08);
+      padding:10px 12px;
       border-radius:14px;
+      margin-bottom:12px;
     }
-    .hint{color:#9bb0c5;font-size:13px;line-height:1.4;margin-top:8px;text-align:center}
+    .pick b{color:var(--accent)}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1 id="title">Tic Tac Toe – Tier-Duell</h1>
+    <header>
+      <h1 id="title">Dobble – Zeit-Duell</h1>
+      <div class="row"><button id="btn-new">Neue Serie</button></div>
+    </header>
 
-    <div class="pick" id="pick-area" style="display:none">
-      <div class="pill">
-        <div style="font-weight:700;margin-bottom:6px">Spieler 1 (X)</div>
-        <select id="pick-p1"></select>
-      </div>
-      <div class="pill">
-        <div style="font-weight:700;margin-bottom:6px">Spieler 2 (O)</div>
-        <select id="pick-p2"></select>
-      </div>
-      <div class="hint">Wähle Tiere und starte dann mit dem ersten Zug. Die Auswahl bleibt im Link gespeichert.</div>
+    <!-- ✅ Tier-Picker (nur wenn neue Serie / vor Start) -->
+    <div id="pickArea" class="pick" style="display:none">
+      <span><b>Spieler 1</b></span>
+      <select id="pickP1"></select>
+      <span><b>Spieler 2</b></span>
+      <select id="pickP2"></select>
+      <span class="help" style="margin:0">Die Auswahl wird im Link gespeichert.</span>
     </div>
 
-    <div id="score" class="score"></div>
-    <div id="msg" class="msg"></div>
-    <div id="board" class="board"></div>
+    <div class="status">
+      <div id="round" class="pill">Bereit</div>
+      <div class="row">
+        <div id="youTime" class="pill timer">⏱️ 0,000 s</div>
+        <div id="oppTime" class="pill timer">—</div>
+      </div>
+    </div>
 
-    <button id="reset">Neue Serie</button>
+    <div class="cards">
+      <div class="card">
+        <div id="cardA"></div>
+        <div class="ring"></div>
+        <div id="flipA" class="flipcover">⏳</div>
+      </div>
+      <div class="card">
+        <div id="cardB"></div>
+        <div class="ring"></div>
+        <div id="flipB" class="flipcover">⏳</div>
+      </div>
+    </div>
+
+    <div class="help" id="helpText">
+      Ablauf: <b>Spiel starten</b> → 3-2-1 → Karten drehen → klicke pro Runde das gemeinsame Symbol.
+      Fehlklick: <b>+2,000 s</b> Strafzeit. 10 Runden. Danach bekommst du einen Link zum Herausfordern.
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <button id="btn-start">Spiel starten</button>
+    </div>
+
+    <div id="shareArea" style="margin-top:12px;display:none">
+      <div class="help" id="shareMsg">Sende diesen Link an deinen Mitspieler:</div>
+      <textarea id="shareLink" class="linkbox" readonly></textarea>
+      <div class="row"><button id="btn-copy">Link kopieren</button></div>
+    </div>
   </div>
 
   <script>
-    const $ = s => document.querySelector(s);
-
-    // ✅ Tiere (Hund dabei + coole Optionen)
+    /* ======= Tiere ======= */
     const ANIMALS = {
-      dog:   { emoji:"🐶", name:"Hund" },
-      cat:   { emoji:"🐱", name:"Katze" },
-      owl:   { emoji:"🦉", name:"Eule" },
-      zebra: { emoji:"🦓", name:"Zebra" },
-      fox:   { emoji:"🦊", name:"Fuchs" },
-      wolf:  { emoji:"🐺", name:"Wolf" },
-      panda: { emoji:"🐼", name:"Panda" },
-      lion:  { emoji:"🦁", name:"Löwe" },
-      tiger: { emoji:"🐯", name:"Tiger" },
-      shark: { emoji:"🦈", name:"Hai" },
-      dragon:{ emoji:"🐉", name:"Drache" },
-      unicorn:{emoji:"🦄", name:"Einhorn" },
-      monkey:{ emoji:"🐵", name:"Affe" },
-      frog:  { emoji:"🐸", name:"Frosch" }
+      dog:{emoji:"🐶",name:"Hund"},
+      cat:{emoji:"🐱",name:"Katze"},
+      owl:{emoji:"🦉",name:"Eule"},
+      zebra:{emoji:"🦓",name:"Zebra"},
+      fox:{emoji:"🦊",name:"Fuchs"},
+      wolf:{emoji:"🐺",name:"Wolf"},
+      panda:{emoji:"🐼",name:"Panda"},
+      lion:{emoji:"🦁",name:"Löwe"},
+      tiger:{emoji:"🐯",name:"Tiger"},
+      shark:{emoji:"🦈",name:"Hai"},
+      dragon:{emoji:"🐉",name:"Drache"},
+      unicorn:{emoji:"🦄",name:"Einhorn"},
+      monkey:{emoji:"🐵",name:"Affe"},
+      frog:{emoji:"🐸",name:"Frosch"}
     };
-
-    // Abwärtskompatibel: alte Keys
-    const normalizeAnimal = (k, fallback) => {
-      if (!k) return fallback;
-      if (k === "eule") k = "owl";
-      if (k === "zëbra") k = "zebra";
-      return ANIMALS[k] ? k : fallback;
+    const normalizeAnimal=(k,fallback)=>{
+      if(!k) return fallback;
+      if(k==="eule") k="owl";
+      if(k==="zëbra") k="zebra";
+      return ANIMALS[k]?k:fallback;
     };
+    const label=k=>`${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
 
-    const label = k => `${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
-    const icon  = k => ANIMALS[k].emoji;
+    /* ======= Spiel-Logik ======= */
+    const SYMBOLS=["🍎","🍌","🍇","🍒","🍉","🍓","🥝","🍍","🥥","🍑","🍐","🍋","🍊","🥕","🌽","🥦","🍄","🥨","🍪","🍰","🍩","🍔","🍟","🌭","🍕","🍗","🍖","🥚","🧀","🥞","🍤","🍣","🍙","🍜","🥟","🍱","🍛","🍝","🌮","🌯","🥗","🥐","🥯","☕","🍵","🥤","🍺","⚽","🏀","🎲","🎯","🎧","🎈","🎁","⭐","🔥","❄️","🌈","⚡","💎","🧩","🖊️","📎","📦","🚗","✈️","🚀","🚲","🏠","💡","📱","⌚","🎸","🎹","🎻","🎮","🧸","🪁","🛼","🏓","♟️"];
+    const CARD_SIZE=7, ROUNDS=10, PENALTY_MS=2000;
 
-    function parseQ(){
-      const q=new URLSearchParams(location.search);
-      return {
-        b: (q.get("b")||"........."), // 9 chars
-        t: q.get("t")||"x",
-        s1: parseInt(q.get("s1")||"0",10),
-        s2: parseInt(q.get("s2")||"0",10),
-        p1: normalizeAnimal(q.get("p1"), "dog"),    // ✅ Standard: Hund
-        p2: normalizeAnimal(q.get("p2"), "zebra")
-      };
+    const $=s=>document.querySelector(s);
+    const Q=new URLSearchParams(location.search);
+    const seed=Q.get("s")||rndSeed();
+
+    // Zeiten/Role
+    const t1ms=Q.get("t1")?parseInt(Q.get("t1"),10):null;
+    const t2ms=Q.get("t2")?parseInt(Q.get("t2"),10):null;
+    const role=Q.get("role")||(t1ms!=null?"p2":"p1");
+
+    // Tiere aus URL
+    let p1 = normalizeAnimal(Q.get("p1"), "dog");   // ✅ Standard: Hund
+    let p2 = normalizeAnimal(Q.get("p2"), "zebra");
+
+    function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+    function strSeed(s){let h=1779033703;for(let i=0;i<s.length;i++){h=Math.imul(h^s.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19)}return h>>>0}
+    function rndSeed(){return Math.random().toString(36).slice(2,10)}
+    function shuffle(a,r){for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+    function genRound(seed,idx){
+      const rnd=mulberry32(strSeed(seed+"|"+idx));
+      const common=SYMBOLS[Math.floor(rnd()*SYMBOLS.length)];
+      function pick(k,avoid){const set=new Set();while(set.size<k){const s=SYMBOLS[Math.floor(rnd()*SYMBOLS.length)];if(s===common)continue;if(avoid&&avoid.has(s))continue;set.add(s)}return[...set]}
+      const A=pick(CARD_SIZE-1,null), B=pick(CARD_SIZE-1,new Set(A));
+      return { common, cardA:shuffle([common,...A],rnd), cardB:shuffle([common,...B],rnd) };
     }
 
-    function linkTo(params){
-      const url=new URL(location.origin+location.pathname);
-      Object.entries(params).forEach(([k,v])=>{
-        if(v!=null) url.searchParams.set(k, String(v));
-      });
-      return url.toString();
-    }
+    function baseUrl(){return location.origin+location.pathname}
+    function fmtMs(ms){return (ms/1000).toFixed(3).replace('.',',')+" s"}
 
-    function winner(b){
-      const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-      for(const [a,c,d] of wins){
-        if(b[a]!=='.' && b[a]===b[c] && b[a]===b[d]) return b[a];
-      }
-      if(!b.includes(".")) return "draw";
-      return null;
+    // ✅ Links enthalten p1/p2
+    function linkChallengeForP2(seed,t1){
+      const u=new URL(baseUrl());
+      u.searchParams.set("s",seed);
+      u.searchParams.set("t1",String(t1));
+      u.searchParams.set("role","p2");
+      u.searchParams.set("p1",p1);
+      u.searchParams.set("p2",p2);
+      return u.toString()
     }
-
-    function setTitle(p1,p2){
-      const t = `Tic Tac Toe – ${label(p1)} (X) vs. ${label(p2)} (O)`;
+    function linkResult(seed,t1,t2){
+      const u=new URL(baseUrl());
+      u.searchParams.set("s",seed);
+      u.searchParams.set("t1",String(t1));
+      u.searchParams.set("t2",String(t2));
+      u.searchParams.set("p1",p1);
+      u.searchParams.set("p2",p2);
+      return u.toString()
+    }
+    function setTitle(){
+      const t = `Dobble – Zeit-Duell ${label(p1)} vs. ${label(p2)}`;
       $("#title").textContent = t;
       document.title = t;
     }
 
-    function initAnimalPickerIfNewGame(state){
-      const isFresh = state.b === "........." && state.s1 === 0 && state.s2 === 0 && state.t === "x";
-      const area = $("#pick-area");
-      if (!isFresh){
-        area.style.display = "none";
-        return;
-      }
-      area.style.display = "flex";
+    // ✅ Picker nur wenn neue Serie (keine Zeiten vorhanden) und noch nicht gestartet
+    function initPicker(){
+      const show = (t1ms==null && t2ms==null); // nur in „neutralem“ Zustand
+      $("#pickArea").style.display = show ? "flex" : "none";
+      if(!show) return;
 
-      const p1Sel = $("#pick-p1");
-      const p2Sel = $("#pick-p2");
-      p1Sel.innerHTML = "";
-      p2Sel.innerHTML = "";
-
-      const keys = Object.keys(ANIMALS);
-      for (const k of keys){
-        const o1 = document.createElement("option");
-        o1.value = k; o1.textContent = `${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
+      const p1Sel=$("#pickP1"), p2Sel=$("#pickP2");
+      p1Sel.innerHTML=""; p2Sel.innerHTML="";
+      const keys=Object.keys(ANIMALS);
+      for(const k of keys){
+        const o1=document.createElement("option");
+        o1.value=k; o1.textContent=`${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
         p1Sel.appendChild(o1);
 
-        const o2 = document.createElement("option");
-        o2.value = k; o2.textContent = `${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
+        const o2=document.createElement("option");
+        o2.value=k; o2.textContent=`${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
         p2Sel.appendChild(o2);
       }
+      p1Sel.value=p1; p2Sel.value=p2;
 
-      p1Sel.value = state.p1;
-      p2Sel.value = state.p2;
-
-      const apply = ()=>{
-        const p1 = normalizeAnimal(p1Sel.value,"dog");
-        const p2 = normalizeAnimal(p2Sel.value,"zebra");
-        setTitle(p1,p2);
-        // speichere Auswahl sofort im Link (ohne Seite neu zu laden)
-        history.replaceState({}, "", linkTo({b:state.b,t:state.t,s1:state.s1,s2:state.s2,p1,p2}));
+      const apply=()=>{
+        p1=normalizeAnimal(p1Sel.value,"dog");
+        p2=normalizeAnimal(p2Sel.value,"zebra");
+        setTitle();
+        // Auswahl in URL speichern (ohne reload)
+        const u=new URL(location.href);
+        u.searchParams.set("p1",p1);
+        u.searchParams.set("p2",p2);
+        history.replaceState({}, "", u.toString());
       };
-      p1Sel.addEventListener("change", apply);
-      p2Sel.addEventListener("change", apply);
+      p1Sel.onchange=apply;
+      p2Sel.onchange=apply;
       apply();
     }
 
-    function render(){
-      const {b,t,s1,s2,p1,p2}=parseQ();
-      const arr=b.split("");
-      const w=winner(arr);
+    // Initial UI
+    setTitle();
+    initPicker();
 
-      setTitle(p1,p2);
-      initAnimalPickerIfNewGame({b,t,s1,s2,p1,p2});
+    $("#oppTime").textContent = (role==="p2" && t1ms!=null) ? `${label(p1)} Zeit: ${fmtMs(t1ms)}` : "—";
+    $("#round").textContent = role==="p2" ? "Herausforderung bereit" : "Bereit";
+    updateYouTime(0);
+    clearCards(true);
 
-      $("#score").textContent = `${label(p1)}: ${s1}  |  ${label(p2)}: ${s2}`;
+    $("#btn-new").onclick=()=>location.href=baseUrl();
+    $("#btn-start").onclick=startRun;
 
-      $("#msg").textContent =
-        w==="x" ? `${label(p1)} gewinnt!`
-        : w==="o" ? `${label(p2)} gewinnt!`
-        : w==="draw" ? "Unentschieden!"
-        : (t==="x" ? `${label(p1)} ist dran` : `${label(p2)} ist dran`);
+    if(t1ms!=null && t2ms!=null){
+      showFinalComparison(t1ms,t2ms);
+      disableInteraction();
+      $("#btn-start").disabled = true;
+      $("#btn-start").style.opacity = .6;
+      $("#btn-start").style.cursor = "not-allowed";
+      $("#pickArea").style.display = "none";
+    }
 
-      const board=$("#board");
-      board.innerHTML="";
+    let roundIndex=0,running=false,elapsedMs=0,tStart=0,countdownTimer=null;
 
-      arr.forEach((val,i)=>{
-        const div=document.createElement("div");
-        div.className="cell"+(val!=='.'?" taken":"");
-        div.textContent = val==="x" ? icon(p1) : val==="o" ? icon(p2) : "";
+    function updateYouTime(ms){$("#youTime").textContent=`⏱️ ${fmtMs(ms)}`}
+    function setRoundLabel(){$("#round").textContent=`Runde ${roundIndex+1}/${ROUNDS}`}
 
-        if(val==="." && !w){
-          div.onclick=async ()=>{
-            const state=parseQ(); // frisch lesen (falls Picker geändert)
-            const arr2=state.b.split("");
-            arr2[i]=state.t;
+    function clearCards(covered=false){
+      $("#cardA").innerHTML=""; $("#cardB").innerHTML="";
+      $("#flipA").classList.toggle("hidden",!covered);
+      $("#flipB").classList.toggle("hidden",!covered);
+    }
 
-            let ns1=state.s1, ns2=state.s2;
-            const res=winner(arr2);
-            if(res==="x") ns1++;
-            else if(res==="o") ns2++;
+    function renderRound(i){
+      const {common,cardA,cardB}=genRound(seed,i);
+      clearCards(false);
+      renderCard($("#cardA"),cardA,common,i,0);
+      renderCard($("#cardB"),cardB,common,i,1);
+      setRoundLabel();
+    }
 
-            const nextTurn=(state.t==="x"?"o":"x");
-            const url=linkTo({b:arr2.join(""),t:nextTurn,s1:ns1,s2:ns2,p1:state.p1,p2:state.p2});
+    function renderCard(container,symbols,common,idx,side){
+      container.innerHTML="";
+      const diameter = container.clientWidth || 300;
+      const baseSize = Math.max(32, Math.min(64, diameter * 0.17));
 
-            try{
-              await navigator.clipboard.writeText(url);
-              alert("Link kopiert! Schick ihn deinem Mitspieler.");
-            }catch(e){
-              alert("Konnte Link nicht kopieren. Markiere ihn aus der Adresszeile und sende ihn manuell.");
-            }
+      const anchors=[
+        {x:18,y:22},{x:38,y:16},{x:62,y:14},{x:82,y:22},
+        {x:24,y:38},{x:50,y:30},{x:76,y:38},
+        {x:20,y:58},{x:40,y:50},{x:60,y:50},{x:80,y:58},
+        {x:24,y:76},{x:50,y:84},{x:76,y:76},{x:50,y:66}
+      ];
+      const rnd=mulberry32(strSeed(seed+"|"+idx+"|"+side));
+      const picks=shuffle([...anchors],rnd).slice(0,symbols.length);
 
-            location.href=url; // optional direkt aufrufen (wie bei dir)
-          };
-        }
-        board.appendChild(div);
+      symbols.forEach((sym,i)=>{
+        const a=picks[i];
+        const span=document.createElement("span");
+        span.className="symbol";
+        span.textContent=sym;
+
+        const size = baseSize * (0.6 + rnd()*0.5);
+        const rot  = (rnd()*60 - 30).toFixed(1);
+        const scale= (0.9 + rnd()*0.4).toFixed(3);
+        const jx   = (rnd()*4-2).toFixed(1);
+        const jy   = (rnd()*4-2).toFixed(1);
+
+        span.style.left = `calc(${a.x}% + ${jx}px)`;
+        span.style.top  = `calc(${a.y}% + ${jy}px)`;
+        span.style.fontSize = size + "px";
+        span.style.transform = `translate(-50%,-50%) rotate(${rot}deg) scale(${scale})`;
+
+        span.addEventListener("click",()=>onPick(span,sym,common),{once:false});
+        container.appendChild(span);
       });
     }
 
-    $("#reset").onclick=()=>{
-      // ✅ Neue Serie, Tierwahl bleibt (p1/p2) – aber Scores resetten.
-      const s=parseQ();
-      const url=linkTo({b:".........",t:"x",s1:0,s2:0,p1:s.p1,p2:s.p2});
-      location.href=url;
-    };
+    function disableInteraction(){document.querySelectorAll(".symbol").forEach(el=>el.classList.add("disabled"))}
+    function enableInteraction(){document.querySelectorAll(".symbol").forEach(el=>el.classList.remove("disabled"))}
 
-    render();
+    function startRun(){
+      if(running || (t1ms!=null && role==="p2" && t2ms!=null)) return;
+
+      // Picker ausblenden sobald gestartet
+      $("#pickArea").style.display="none";
+
+      running=true; roundIndex=0; elapsedMs=0;
+      $("#shareArea").style.display="none"; $("#shareLink").value=""; $("#shareMsg").textContent="";
+      clearCards(true);
+
+      let count=3; $("#flipA").textContent=count; $("#flipB").textContent=count;
+      countdownTimer=setInterval(()=>{
+        count--;
+        if(count>0){$("#flipA").textContent=count; $("#flipB").textContent=count}
+        else{
+          clearInterval(countdownTimer);
+          $("#flipA").classList.add("hidden"); $("#flipB").classList.add("hidden");
+          tStart=performance.now(); renderRound(roundIndex); enableInteraction();
+        }
+      },1000);
+    }
+
+    async function onPick(elem,sym,common){
+      if(!running) return;
+
+      if(sym===common){
+        elem.classList.add("correct"); disableInteraction();
+        roundIndex++;
+        if(roundIndex>=ROUNDS){
+          const total=Math.max(0,Math.round(performance.now()-tStart)+elapsedMs);
+          running=false; updateYouTime(total); $("#round").textContent="Fertig!"; endOfRun(total);
+        }else{
+          setTimeout(()=>{renderRound(roundIndex); enableInteraction()},180);
+        }
+      }else{
+        elapsedMs+=PENALTY_MS;
+        elem.classList.add("wrong"); setTimeout(()=>elem.classList.remove("wrong"),250);
+        const preview=Math.max(0,Math.round(performance.now()-tStart)+elapsedMs);
+        updateYouTime(preview);
+      }
+    }
+
+    function endOfRun(totalMs){
+      if(role==="p1"){
+        const link=linkChallengeForP2(seed,totalMs);
+        showShare(link,`Deine Zeit: ${fmtMs(totalMs)}. Sende den Link an ${label(p2)}!`);
+        $("#oppTime").textContent="—";
+      }else{
+        if(t1ms!=null){
+          $("#oppTime").textContent=`${label(p1)} Zeit: ${fmtMs(t1ms)}`;
+          showFinalComparison(t1ms,totalMs);
+          const resLink=linkResult(seed,t1ms,totalMs);
+          showShare(resLink,"Ergebnis-Link teilen:");
+        }else{
+          const resLink=linkResult(seed,totalMs,totalMs);
+          showShare(resLink,"Ergebnis-Link teilen:");
+        }
+      }
+    }
+
+    function showShare(url,msg){
+      $("#shareArea").style.display="block";
+      $("#shareMsg").textContent=msg; $("#shareLink").value=url;
+      $("#btn-copy").onclick=async()=>{try{await navigator.clipboard.writeText(url);$("#btn-copy").textContent="Kopiert ✅";}catch(e){}};
+    }
+
+    function showFinalComparison(t1,t2){
+      const youAreP2=(role==="p2");
+      const p1Wins = t1<t2;
+      const p2Wins = t2<t1;
+
+      const winText = p1Wins ? `🏆 ${label(p1)} gewinnt!`
+                    : p2Wins ? `🏆 ${label(p2)} gewinnt!`
+                    : "🤝 Exaktes Unentschieden!";
+
+      $("#round").textContent="Ergebnis";
+
+      $("#youTime").innerHTML = (youAreP2 ? "Deine Zeit: " : `${label(p1)} Zeit: `) + `<b>${fmtMs(youAreP2?t2:t1)}</b>`;
+      $("#oppTime").innerHTML = (youAreP2 ? `${label(p1)} Zeit: ` : `${label(p2)} Zeit: `) + `<b>${fmtMs(youAreP2?t1:t2)}</b>`;
+
+      // Lead-Markierung
+      const youWin = youAreP2 ? (t2<t1) : (t1<t2);
+      (youWin ? $("#youTime") : $("#oppTime")).classList.add("lead");
+
+      // (kleiner Fix: nur ein Ergebnis-Block einfügen)
+      const existing = document.getElementById("finalMsg");
+      if (existing) existing.remove();
+
+      const msg=document.createElement("div");
+      msg.id="finalMsg";
+      msg.className="help";
+      msg.innerHTML = winText + (t1!==t2 ? ` (Δ ${(Math.abs(t1-t2)/1000).toFixed(3).replace('.',',')} s)` : "");
+      $("#shareArea").before(msg);
+    }
   </script>
 </body>
 </html>
+
