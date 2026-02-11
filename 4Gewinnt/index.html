@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>4 Gewinnt – Eule vs. Zëbra (Link-Duell)</title>
+  <title>4 Gewinnt – Tier-Duell (Link-Spiel)</title>
   <style>
     :root{
       --bg:#0b0f14; --card:#121823; --ink:#e8eef7; --muted:#9bb0c5;
@@ -25,6 +25,15 @@
       padding:10px 12px; border-radius:12px; cursor:pointer; font-size:14px;
     }
     button:hover{border-color:rgba(255,255,255,.28)}
+    select{
+      border:1px solid rgba(255,255,255,.15);
+      background:rgba(255,255,255,.04);
+      color:var(--ink);
+      padding:10px 12px;
+      border-radius:12px;
+      font-size:14px;
+      outline:none;
+    }
     .status{
       background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
       border:1px solid rgba(255,255,255,.1); border-radius:14px; padding:12px 14px; margin-bottom:10px;
@@ -68,24 +77,40 @@
     .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px}
     .start-screen{padding:20px; border:1px solid rgba(255,255,255,.1); border-radius:16px; background:var(--card); text-align:center}
     .start-screen h2{margin-top:0}
+    .pill{display:inline-flex; gap:8px; align-items:center; padding:8px 10px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:rgba(255,255,255,.03)}
+    .sub{font-size:13px; color:var(--muted)}
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <h1>4 Gewinnt – 🦉 Eule (🔴) vs. 🦓 Zëbra (🟡)</h1>
+      <h1 id="title">4 Gewinnt – Tier-Duell</h1>
       <div class="controls">
         <button id="btn-new">Neue Serie</button>
       </div>
     </header>
 
     <div id="start-area" class="start-screen" style="display:none">
-      <h2>Wer startet?</h2>
-      <p>Wähle aus, ob <b>🦉 Eule</b> oder <b>🦓 Zëbra</b> beginnen soll:</p>
-      <div class="row">
-        <button id="start-eule">🦉 Eule beginnt</button>
-        <button id="start-zebra">🦓 Zëbra beginnt</button>
+      <h2>Wählt eure Tiere</h2>
+      <p class="sub">Spieler 1 ist <b>🔴 Rot</b>, Spieler 2 ist <b>🟡 Gelb</b>. Danach wählt ihr, wer startet.</p>
+
+      <div class="row" style="justify-content:center">
+        <span class="pill">
+          <b>Spieler 1 (🔴)</b>
+          <select id="pick-p1"></select>
+        </span>
+        <span class="pill">
+          <b>Spieler 2 (🟡)</b>
+          <select id="pick-p2"></select>
+        </span>
       </div>
+
+      <h2 style="margin-top:18px">Wer startet?</h2>
+      <div class="row" style="justify-content:center">
+        <button id="start-p1">Spieler 1 beginnt</button>
+        <button id="start-p2">Spieler 2 beginnt</button>
+      </div>
+      <p class="note">Tipp: Schick den Start-Link an beide – dann ist klar, wer dran ist.</p>
     </div>
 
     <div id="game-area" style="display:none">
@@ -112,64 +137,128 @@
   <script>
     // --- Config ---
     const COLS=7, ROWS=6;
-    const P1=1, P2=2; // P1 = Eule/rot, P2 = Zëbra/gelb (Farben bleiben fix)
-    const EMOJI = { [P1]:"🦉 Eule", [P2]:"🦓 Zëbra" };
+    const P1=1, P2=2; // P1 = rot, P2 = gelb
+
+    // ✅ Tiere (mind. Hund dabei + "coole" Optionen)
+    const ANIMALS = {
+      dog:   { emoji:"🐶", name:"Hund" },
+      cat:   { emoji:"🐱", name:"Katze" },
+      owl:   { emoji:"🦉", name:"Eule" },
+      zebra: { emoji:"🦓", name:"Zebra" },
+      fox:   { emoji:"🦊", name:"Fuchs" },
+      wolf:  { emoji:"🐺", name:"Wolf" },
+      panda: { emoji:"🐼", name:"Panda" },
+      lion:  { emoji:"🦁", name:"Löwe" },
+      tiger: { emoji:"🐯", name:"Tiger" },
+      shark: { emoji:"🦈", name:"Hai" },
+      dragon:{ emoji:"🐉", name:"Drache" },
+      unicorn:{emoji:"🦄", name:"Einhorn" },
+      monkey:{ emoji:"🐵", name:"Affe" },
+      frog:  { emoji:"🐸", name:"Frosch" }
+    };
+
     const DOT = { [P1]:"red", [P2]:"yellow" };
-    const CHIP = DOT;
 
     // --- DOM ---
     const $ = s => document.querySelector(s);
     const $board = $("#board");
     const $status = $("#status-text");
     const $dot = $("#turn-dot");
-    const $share = $("#share-area");
     const $shareLink = $("#share-link");
+    const $title = $("#title");
 
-    // --- URL / Startwahl ---
+    // --- URL Params ---
     const Q = new URLSearchParams(location.search);
     const movesStr = Q.get("m") || "";
-    // 'st' (starter) = wer beginnt: 'eule' | 'zebra'
+    // Starter: '1' oder '2'
     const rawStarter = Q.get("st");
-    const starter = (!rawStarter || rawStarter === "null" || rawStarter === "") ? null : rawStarter;
-    // 'to' = wer SOLL diesen Link benutzen (optional)
+    const starter = (rawStarter === "1" || rawStarter === "2") ? parseInt(rawStarter,10) : null;
+    // Wer darf diesen Link spielen: '1' oder '2'
     const rawTo = Q.get("to");
-    let to = (!rawTo || rawTo === "null" || rawTo === "") ? null : rawTo;
+    let to = (rawTo === "1" || rawTo === "2") ? parseInt(rawTo,10) : null;
 
-    // Falls noch keine Züge und kein Starter: Startscreen zeigen
-    if (!movesStr && !starter){
-      $("#start-area").style.display = "block";
-      $("#game-area").style.display = "none";
-      $("#start-eule").onclick  = ()=> location.href = makeLink("", "eule", "eule");  // Eule beginnt, Eule ist dran
-      $("#start-zebra").onclick = ()=> location.href = makeLink("", "zebra", "zebra"); // Zebra beginnt, Zebra ist dran
-    } else {
-      $("#start-area").style.display = "none";
-      $("#game-area").style.display = "block";
-      startGame();
+    // Tiere der Spieler
+    const p1Key = validAnimal(Q.get("p1")) ? Q.get("p1") : "owl";
+    const p2Key = validAnimal(Q.get("p2")) ? Q.get("p2") : "zebra";
+
+    function validAnimal(k){ return !!(k && ANIMALS[k]); }
+    function animalLabel(player){
+      const k = (player===P1) ? p1Key : p2Key;
+      const a = ANIMALS[k];
+      return `${a.emoji} ${a.name}`;
     }
 
     function baseUrl(){ return location.origin + location.pathname; }
 
-    // Link-Builder: setzt nur Parameter, die Sinn ergeben
-    function makeLink(mStr, st, toWho){
+    // Link-Builder
+    function makeLink(mStr, st, toWho, a1, a2){
       const u = new URL(baseUrl());
       if (mStr) u.searchParams.set("m", mStr);
-      if (st)   u.searchParams.set("st", st);
-      if (toWho) u.searchParams.set("to", toWho);
+      if (st)   u.searchParams.set("st", String(st));
+      if (toWho)u.searchParams.set("to", String(toWho));
+      u.searchParams.set("p1", a1);
+      u.searchParams.set("p2", a2);
       return u.toString();
+    }
+
+    function updateTitle(){
+      $title.textContent = `4 Gewinnt – ${animalLabel(P1)} (🔴) vs. ${animalLabel(P2)} (🟡)`;
+      document.title = $title.textContent;
+    }
+
+    // --- Startscreen oder Spiel ---
+    if (!movesStr && !starter){
+      $("#start-area").style.display = "block";
+      $("#game-area").style.display = "none";
+
+      // Dropdowns füllen
+      const p1Sel = $("#pick-p1");
+      const p2Sel = $("#pick-p2");
+
+      const keys = Object.keys(ANIMALS);
+      for (const k of keys){
+        const opt1 = document.createElement("option");
+        opt1.value = k;
+        opt1.textContent = `${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
+        p1Sel.appendChild(opt1);
+
+        const opt2 = document.createElement("option");
+        opt2.value = k;
+        opt2.textContent = `${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
+        p2Sel.appendChild(opt2);
+      }
+
+      // Defaults
+      p1Sel.value = "dog";   // ✅ Hund ist Standard für Spieler 1
+      p2Sel.value = "zebra";
+
+      function renderStartTitle(){
+        const a1 = p1Sel.value, a2 = p2Sel.value;
+        $("#start-p1").textContent = `${ANIMALS[a1].emoji} ${ANIMALS[a1].name} beginnt`;
+        $("#start-p2").textContent = `${ANIMALS[a2].emoji} ${ANIMALS[a2].name} beginnt`;
+        $title.textContent = `4 Gewinnt – ${ANIMALS[a1].emoji} ${ANIMALS[a1].name} (🔴) vs. ${ANIMALS[a2].emoji} ${ANIMALS[a2].name} (🟡)`;
+        document.title = $title.textContent;
+      }
+      p1Sel.onchange = renderStartTitle;
+      p2Sel.onchange = renderStartTitle;
+      renderStartTitle();
+
+      $("#start-p1").onclick = ()=> location.href = makeLink("", 1, 1, p1Sel.value, p2Sel.value);
+      $("#start-p2").onclick = ()=> location.href = makeLink("", 2, 2, p1Sel.value, p2Sel.value);
+
+    } else {
+      $("#start-area").style.display = "none";
+      $("#game-area").style.display = "block";
+      updateTitle();
+      startGame();
     }
 
     // --- Spielstart ---
     function startGame(){
-      // Board aufbauen aus Zugfolge
       let board = Array.from({length:ROWS}, ()=> Array(COLS).fill(0));
       let lastMove = null;
 
-      // Hilfsfunktionen
-      const whoAfterIndex = (i)=> {
-        // i = Zugindex (0-basiert), Starter spielt bei i%2==0
-        const w = (i % 2 === 0) ? (starter || "eule") : ((starter || "eule") === "eule" ? "zebra" : "eule");
-        return (w === "eule") ? P1 : P2;
-      };
+      const whoAfterIndex = (i)=> (i % 2 === 0) ? (starter || 1) : ((starter || 1) === 1 ? 2 : 1);
       const currentPlayer = ()=> whoAfterIndex(movesStr.length);
 
       applyMovesFromString(movesStr);
@@ -177,10 +266,10 @@
       let winnerInfo = computeWinnerInfo();
       const fullAtStart = isBoardFull();
 
-      // Wenn 'to' nicht gesetzt oder inkonsistent → auf aktuellen Spieler setzen
-      if (!to || (to === "eule" && currentPlayer()!==P1) || (to === "zebra" && currentPlayer()!==P2)){
-        to = (currentPlayer()===P1) ? "eule" : "zebra";
-        history.replaceState({}, "", makeLink(movesStr, starter || "eule", to));
+      // to sanity: falls fehlt oder inkonsistent -> currentPlayer
+      if (!to || to !== currentPlayer()){
+        to = currentPlayer();
+        history.replaceState({}, "", makeLink(movesStr, starter || 1, to, p1Key, p2Key));
       }
 
       buildBoard();
@@ -189,11 +278,10 @@
 
       if (winnerInfo || fullAtStart) disableInput();
 
-      // ----- Funktionen -----
       function applyMovesFromString(mStr){
         for(let i=0;i<mStr.length;i++){
           const col = parseInt(mStr[i],10);
-          const player = whoAfterIndex(i); // abhängig vom Starter!
+          const player = whoAfterIndex(i);
           const row = findDropRow(col);
           if(row === -1) break;
           board[row][col] = player;
@@ -241,11 +329,13 @@
       function getCellEl(c,r){ return $board.children[c].children[r]; }
       function findDropRow(col){ for(let r=ROWS-1;r>=0;r--) if(board[r][col]===0) return r; return -1; }
       function isBoardFull(){ return board.every(row => row.every(v => v!==0)); }
-      function playerName(p){ return EMOJI[p]; }
 
       function updateStatus(){
+        // Titel aktualisieren (falls Link geteilt wurde)
+        updateTitle();
+
         if (winnerInfo){
-          $status.innerHTML = `Sieg! ${playerName(winnerInfo.player)} hat 4 in einer Linie.`;
+          $status.innerHTML = `Sieg! ${animalLabel(winnerInfo.player)} hat 4 in einer Linie.`;
           $dot.className = "disc " + (winnerInfo.player===P1? "red":"yellow");
           showShare(false);
           return;
@@ -256,13 +346,12 @@
           showShare(false);
           return;
         }
+
         const p = currentPlayer();
-        $status.innerHTML = `${playerName(p)} ist dran`;
+        $status.innerHTML = `${animalLabel(p)} ist dran`;
         $dot.className = "disc " + (p===P1? "red":"yellow");
 
-        // nur der richtige Spieler darf klicken
-        const linkOwner = (to === "eule") ? P1 : P2;
-        if (linkOwner !== p){ disableInput(); showShare(false); }
+        if (to !== p){ disableInput(); showShare(false); }
         else { enableInput(); showShare(false); }
       }
 
@@ -270,8 +359,7 @@
         if (winnerInfo || isBoardFull()) return;
 
         const p = currentPlayer();
-        const linkOwner = (to === "eule") ? P1 : P2;
-        if (linkOwner !== p) return; // nicht dein Link / nicht dein Zug
+        if (to !== p) return;
 
         const col = parseInt(e.currentTarget.dataset.col,10);
         const row = findDropRow(col);
@@ -279,26 +367,27 @@
 
         board[row][col] = p;
         lastMove = {col,row,player:p};
+
         const chip = getCellEl(col,row).querySelector(".chip");
         chip.className = "chip " + (p===P1? "red":"yellow");
         requestAnimationFrame(()=> chip.classList.add("show"));
 
-        winnerInfo = computeWinnerInfo(); paintBoard();
+        winnerInfo = computeWinnerInfo();
+        paintBoard();
         const full = isBoardFull();
 
-        // Nächster Link: m + Spalte, st bleibt, to wechselt zur Gegenseite
         const nextMoves = movesStr + String(col);
-        const nextTo = (p===P1) ? "zebra" : "eule";
-        const link = makeLink(nextMoves, starter || "eule", nextTo);
+        const nextTo = (p===P1) ? P2 : P1;
+        const link = makeLink(nextMoves, starter || 1, nextTo, p1Key, p2Key);
 
         disableInput();
 
         if (winnerInfo || full){
-          $status.innerHTML = winnerInfo ? `Sieg! ${playerName(winnerInfo.player)} hat 4 in einer Linie.` : `Unentschieden – Brett voll.`;
+          $status.innerHTML = winnerInfo ? `Sieg! ${animalLabel(winnerInfo.player)} hat 4 in einer Linie.` : `Unentschieden – Brett voll.`;
           $dot.className = "disc " + (winnerInfo ? (winnerInfo.player===P1? "red":"yellow") : "");
-          showShare(true, link); // Endzustand teilen
+          showShare(true, link);
         } else {
-          $status.innerHTML = `Zug gesetzt. Sende den Link an ${playerName(p===P1?P2:P1)}.`;
+          $status.innerHTML = `Zug gesetzt. Sende den Link an ${animalLabel(nextTo)}.`;
           $dot.className = "disc " + (p===P1? "yellow":"red");
           showShare(true, link);
         }
@@ -312,7 +401,9 @@
         share.style.display = show ? "block" : "none";
         if (show){
           $shareLink.value = link;
-          $("#btn-copy").onclick = async ()=>{ try{ await navigator.clipboard.writeText(link); $("#btn-copy").textContent="Kopiert ✅"; }catch(e){} };
+          $("#btn-copy").onclick = async ()=>{
+            try{ await navigator.clipboard.writeText(link); $("#btn-copy").textContent="Kopiert ✅"; }catch(e){}
+          };
         }
       }
 
@@ -336,10 +427,7 @@
       }
       function inBounds(c,r){ return c>=0&&c<COLS&&r>=0&&r<ROWS; }
 
-      $("#btn-new").addEventListener("click", ()=>{
-        // Basis-URL ohne Parameter -> Startscreen erscheint
-        location.href = baseUrl();
-      });
+      $("#btn-new").addEventListener("click", ()=> location.href = baseUrl());
     }
   </script>
 </body>
