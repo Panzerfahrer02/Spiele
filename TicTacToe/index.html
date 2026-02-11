@@ -3,46 +3,110 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Tic Tac Toe – Eule vs. Zebra</title>
+  <title>Tic Tac Toe – Tier-Duell</title>
   <style>
-    body{font-family:system-ui;background:#0b0f14;color:#e8eef7;display:grid;place-items:center;min-height:100vh;margin:0}
-    .wrap{background:#121823;padding:20px;border-radius:16px;max-width:400px;width:100%}
-    h1{text-align:center;font-size:20px;margin:0 0 16px}
-    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-    .cell{width:100px;height:100px;display:flex;align-items:center;justify-content:center;font-size:36px;
-      border:1px solid #ffffff22;cursor:pointer;border-radius:8px;background:#1a2332}
+    body{font-family:system-ui;background:#0b0f14;color:#e8eef7;display:grid;place-items:center;min-height:100vh;margin:0;padding:20px}
+    .wrap{background:#121823;padding:20px;border-radius:16px;max-width:440px;width:100%;border:1px solid rgba(255,255,255,.08)}
+    h1{text-align:center;font-size:20px;margin:0 0 12px}
+    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+    .cell{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:42px;
+      border:1px solid #ffffff22;cursor:pointer;border-radius:10px;background:#1a2332}
     .cell.taken{cursor:not-allowed;opacity:.7}
-    .score{display:flex;justify-content:space-between;margin:10px 0;font-weight:bold}
+    .score{display:flex;justify-content:space-between;margin:10px 0;font-weight:bold;gap:10px;flex-wrap:wrap}
     .msg{text-align:center;margin:10px 0;font-size:16px}
-    button{margin-top:10px;padding:10px 14px;border:none;border-radius:8px;background:#6ee7ff;color:#000;font-weight:bold;cursor:pointer;width:100%}
+    button{margin-top:10px;padding:10px 14px;border:none;border-radius:10px;background:#6ee7ff;color:#000;font-weight:bold;cursor:pointer;width:100%}
+    .pick{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+    select{
+      border:1px solid rgba(255,255,255,.15);
+      background:rgba(255,255,255,.04);
+      color:#e8eef7;
+      padding:10px 12px;
+      border-radius:12px;
+      font-size:14px;
+      outline:none;
+      width:100%;
+    }
+    .pill{
+      flex:1; min-width:190px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.03);
+      padding:10px 10px;
+      border-radius:14px;
+    }
+    .hint{color:#9bb0c5;font-size:13px;line-height:1.4;margin-top:8px;text-align:center}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>🦉 Eule vs. 🦓 Zebra</h1>
+    <h1 id="title">Tic Tac Toe – Tier-Duell</h1>
+
+    <div class="pick" id="pick-area" style="display:none">
+      <div class="pill">
+        <div style="font-weight:700;margin-bottom:6px">Spieler 1 (X)</div>
+        <select id="pick-p1"></select>
+      </div>
+      <div class="pill">
+        <div style="font-weight:700;margin-bottom:6px">Spieler 2 (O)</div>
+        <select id="pick-p2"></select>
+      </div>
+      <div class="hint">Wähle Tiere und starte dann mit dem ersten Zug. Die Auswahl bleibt im Link gespeichert.</div>
+    </div>
+
     <div id="score" class="score"></div>
     <div id="msg" class="msg"></div>
     <div id="board" class="board"></div>
+
     <button id="reset">Neue Serie</button>
   </div>
 
   <script>
     const $ = s => document.querySelector(s);
 
+    // ✅ Tiere (Hund dabei + coole Optionen)
+    const ANIMALS = {
+      dog:   { emoji:"🐶", name:"Hund" },
+      cat:   { emoji:"🐱", name:"Katze" },
+      owl:   { emoji:"🦉", name:"Eule" },
+      zebra: { emoji:"🦓", name:"Zebra" },
+      fox:   { emoji:"🦊", name:"Fuchs" },
+      wolf:  { emoji:"🐺", name:"Wolf" },
+      panda: { emoji:"🐼", name:"Panda" },
+      lion:  { emoji:"🦁", name:"Löwe" },
+      tiger: { emoji:"🐯", name:"Tiger" },
+      shark: { emoji:"🦈", name:"Hai" },
+      dragon:{ emoji:"🐉", name:"Drache" },
+      unicorn:{emoji:"🦄", name:"Einhorn" },
+      monkey:{ emoji:"🐵", name:"Affe" },
+      frog:  { emoji:"🐸", name:"Frosch" }
+    };
+
+    // Abwärtskompatibel: alte Keys
+    const normalizeAnimal = (k, fallback) => {
+      if (!k) return fallback;
+      if (k === "eule") k = "owl";
+      if (k === "zëbra") k = "zebra";
+      return ANIMALS[k] ? k : fallback;
+    };
+
+    const label = k => `${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
+    const icon  = k => ANIMALS[k].emoji;
+
     function parseQ(){
       const q=new URLSearchParams(location.search);
       return {
         b: (q.get("b")||"........."), // 9 chars
         t: q.get("t")||"x",
-        s1: parseInt(q.get("s1")||"0"),
-        s2: parseInt(q.get("s2")||"0"),
+        s1: parseInt(q.get("s1")||"0",10),
+        s2: parseInt(q.get("s2")||"0",10),
+        p1: normalizeAnimal(q.get("p1"), "dog"),    // ✅ Standard: Hund
+        p2: normalizeAnimal(q.get("p2"), "zebra")
       };
     }
 
     function linkTo(params){
       const url=new URL(location.origin+location.pathname);
       Object.entries(params).forEach(([k,v])=>{
-        if(v!=null) url.searchParams.set(k,v);
+        if(v!=null) url.searchParams.set(k, String(v));
       });
       return url.toString();
     }
@@ -56,33 +120,98 @@
       return null;
     }
 
+    function setTitle(p1,p2){
+      const t = `Tic Tac Toe – ${label(p1)} (X) vs. ${label(p2)} (O)`;
+      $("#title").textContent = t;
+      document.title = t;
+    }
+
+    function initAnimalPickerIfNewGame(state){
+      const isFresh = state.b === "........." && state.s1 === 0 && state.s2 === 0 && state.t === "x";
+      const area = $("#pick-area");
+      if (!isFresh){
+        area.style.display = "none";
+        return;
+      }
+      area.style.display = "flex";
+
+      const p1Sel = $("#pick-p1");
+      const p2Sel = $("#pick-p2");
+      p1Sel.innerHTML = "";
+      p2Sel.innerHTML = "";
+
+      const keys = Object.keys(ANIMALS);
+      for (const k of keys){
+        const o1 = document.createElement("option");
+        o1.value = k; o1.textContent = `${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
+        p1Sel.appendChild(o1);
+
+        const o2 = document.createElement("option");
+        o2.value = k; o2.textContent = `${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
+        p2Sel.appendChild(o2);
+      }
+
+      p1Sel.value = state.p1;
+      p2Sel.value = state.p2;
+
+      const apply = ()=>{
+        const p1 = normalizeAnimal(p1Sel.value,"dog");
+        const p2 = normalizeAnimal(p2Sel.value,"zebra");
+        setTitle(p1,p2);
+        // speichere Auswahl sofort im Link (ohne Seite neu zu laden)
+        history.replaceState({}, "", linkTo({b:state.b,t:state.t,s1:state.s1,s2:state.s2,p1,p2}));
+      };
+      p1Sel.addEventListener("change", apply);
+      p2Sel.addEventListener("change", apply);
+      apply();
+    }
+
     function render(){
-      const {b,t,s1,s2}=parseQ();
+      const {b,t,s1,s2,p1,p2}=parseQ();
       const arr=b.split("");
       const w=winner(arr);
-      $("#score").textContent=`🦉 Eule: ${s1}  |  🦓 Zebra: ${s2}`;
-      $("#msg").textContent = w==="x" ? "🦉 Eule gewinnt!"
-        : w==="o" ? "🦓 Zebra gewinnt!"
-        : w==="draw" ? "Unentschieden!" 
-        : (t==="x"?"🦉 Eule ist dran":"🦓 Zebra ist dran");
+
+      setTitle(p1,p2);
+      initAnimalPickerIfNewGame({b,t,s1,s2,p1,p2});
+
+      $("#score").textContent = `${label(p1)}: ${s1}  |  ${label(p2)}: ${s2}`;
+
+      $("#msg").textContent =
+        w==="x" ? `${label(p1)} gewinnt!`
+        : w==="o" ? `${label(p2)} gewinnt!`
+        : w==="draw" ? "Unentschieden!"
+        : (t==="x" ? `${label(p1)} ist dran` : `${label(p2)} ist dran`);
 
       const board=$("#board");
       board.innerHTML="";
+
       arr.forEach((val,i)=>{
         const div=document.createElement("div");
         div.className="cell"+(val!=='.'?" taken":"");
-        div.textContent=val==="x"?"🦉":val==="o"?"🦓":"";
+        div.textContent = val==="x" ? icon(p1) : val==="o" ? icon(p2) : "";
+
         if(val==="." && !w){
-          div.onclick=()=>{
-            arr[i]=t;
-            let ns1=s1,ns2=s2;
-            const res=winner(arr);
+          div.onclick=async ()=>{
+            const state=parseQ(); // frisch lesen (falls Picker geändert)
+            const arr2=state.b.split("");
+            arr2[i]=state.t;
+
+            let ns1=state.s1, ns2=state.s2;
+            const res=winner(arr2);
             if(res==="x") ns1++;
             else if(res==="o") ns2++;
-            const nextTurn=(t==="x"?"o":"x");
-            const url=linkTo({b:arr.join(""),t:nextTurn,s1:ns1,s2:ns2});
-            navigator.clipboard.writeText(url).then(()=>alert("Link kopiert! Schick ihn deinem Mitspieler."));
-            location.href=url; // optional direkt aufrufen
+
+            const nextTurn=(state.t==="x"?"o":"x");
+            const url=linkTo({b:arr2.join(""),t:nextTurn,s1:ns1,s2:ns2,p1:state.p1,p2:state.p2});
+
+            try{
+              await navigator.clipboard.writeText(url);
+              alert("Link kopiert! Schick ihn deinem Mitspieler.");
+            }catch(e){
+              alert("Konnte Link nicht kopieren. Markiere ihn aus der Adresszeile und sende ihn manuell.");
+            }
+
+            location.href=url; // optional direkt aufrufen (wie bei dir)
           };
         }
         board.appendChild(div);
@@ -90,7 +219,9 @@
     }
 
     $("#reset").onclick=()=>{
-      const url=linkTo({b:".........",t:"x",s1:0,s2:0});
+      // ✅ Neue Serie, Tierwahl bleibt (p1/p2) – aber Scores resetten.
+      const s=parseQ();
+      const url=linkTo({b:".........",t:"x",s1:0,s2:0,p1:s.p1,p2:s.p2});
       location.href=url;
     };
 
