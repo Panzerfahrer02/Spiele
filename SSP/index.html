@@ -9,7 +9,7 @@
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;background:radial-gradient(1200px 800px at 20% 10%,#122034,var(--bg));color:var(--ink);display:grid;min-height:100svh;place-items:center;padding:24px}
   .wrap{width:100%;max-width:780px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.05);backdrop-filter:blur(6px)}
-  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
   h1{font-size:20px;margin:0;letter-spacing:.3px}
   .card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;margin-top:12px}
   .hint{color:var(--muted);font-size:14px;line-height:1.45}
@@ -25,19 +25,33 @@
   .win{color:var(--win)} .lose{color:var(--lose)} .draw{color:var(--draw)}
   .sep{height:1px;background:rgba(255,255,255,.08);margin:14px 0;border-radius:1px}
   .small{font-size:13px;color:var(--muted)} .pill{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)}
-  .score{display:flex;gap:10px;align-items:center;justify-content:flex-start;margin:6px 0 4px}
+  .score{display:flex;gap:10px;align-items:center;justify-content:flex-start;margin:6px 0 4px;flex-wrap:wrap}
   .score .box{min-width:90px;text-align:center;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);font-weight:700}
   .score .lead{color:var(--accent)}
-  .char-select{display:flex;gap:12px;margin:10px 0}
-  .char-btn{flex:1;text-align:center;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.12);cursor:pointer}
-  .char-btn.active{border-color:var(--accent);background:rgba(110,231,255,.08)}
   textarea.linkbox{width:100%;min-height:72px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:var(--ink);padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* ✅ Auswahl UI */
+  .pick{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  select{
+    border:1px solid rgba(255,255,255,.15);
+    background:rgba(255,255,255,.04);
+    color:var(--ink);
+    padding:10px 12px;
+    border-radius:12px;
+    font-size:14px;
+    outline:none;
+  }
+  .pill2{display:inline-flex;gap:10px;align-items:center;padding:8px 10px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1)}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header><h1>✂️🪨📄 Schere • Stein • Papier</h1></header>
+  <header>
+    <h1 id="title">✂️🪨📄 Schere • Stein • Papier</h1>
+  </header>
+
   <div class="card" id="state-area"></div>
+
   <div class="card">
     <div class="row" style="justify-content:space-between">
       <div class="small">Teile Links per DM. Dieser Modus zeigt Ergebnisse sofort (ohne geheime Züge).</div>
@@ -48,43 +62,70 @@
 
 <script>
   const $ = s => document.querySelector(s);
+
   const CHOICES = { 0:"✂️ Schere", 1:"🪨 Stein", 2:"📄 Papier" };
-  const CHAR = { eule:"🦉 Eule", zebra:"🦓 Zëbra" };
   const WIN = 3;
+
+  // ✅ Tiere (Hund dabei + coole Optionen)
+  const ANIMALS = {
+    dog:   { emoji:"🐶", name:"Hund" },
+    cat:   { emoji:"🐱", name:"Katze" },
+    owl:   { emoji:"🦉", name:"Eule" },
+    zebra: { emoji:"🦓", name:"Zebra" },
+    fox:   { emoji:"🦊", name:"Fuchs" },
+    wolf:  { emoji:"🐺", name:"Wolf" },
+    panda: { emoji:"🐼", name:"Panda" },
+    lion:  { emoji:"🦁", name:"Löwe" },
+    tiger: { emoji:"🐯", name:"Tiger" },
+    shark: { emoji:"🦈", name:"Hai" },
+    dragon:{ emoji:"🐉", name:"Drache" },
+    unicorn:{emoji:"🦄", name:"Einhorn" },
+    monkey:{ emoji:"🐵", name:"Affe" },
+    frog:  { emoji:"🐸", name:"Frosch" }
+  };
+
+  // Abwärtskompatibilität: alte Links mit "eule"/"zebra" funktionieren weiter
+  const normalizeAnimal = (k, fallback) => {
+    if (!k) return fallback;
+    if (k === "eule") k = "owl";
+    if (k === "zëbra") k = "zebra";
+    return ANIMALS[k] ? k : fallback;
+  };
+
+  const label = k => `${ANIMALS[k].emoji} ${ANIMALS[k].name}`;
 
   const outcome = (p1,p2)=> p1===p2? "draw"
     : (p1===0&&p2===2)||(p1===1&&p2===0)||(p1===2&&p2===1) ? "p1" : "p2";
 
   const baseUrl = ()=> location.origin + location.pathname;
+
   const scoreView=(s1,s2,c1,c2)=>`
     <div class="score">
-      <div class="box ${s1>s2?"lead":""}">${CHAR[c1]}: ${s1}</div>
-      <div class="box ${s2>s1?"lead":""}">${CHAR[c2]}: ${s2}</div>
+      <div class="box ${s1>s2?"lead":""}">${label(c1)}: ${s1}</div>
+      <div class="box ${s2>s1?"lead":""}">${label(c2)}: ${s2}</div>
       <span class="small">bis ${WIN}</span>
     </div>`;
 
   const moveBtn = i=>`<button class="move-btn" data-m="${i}">${CHOICES[i]}</button>`;
-  const charSelect = (def)=>`
-    <div class="hint">Wähle deinen Charakter:</div>
-    <div class="char-select">
-      <div class="char-btn ${def==="eule"?"active":""}" data-c="eule">${CHAR.eule}</div>
-      <div class="char-btn ${def==="zebra"?"active":""}" data-c="zebra">${CHAR.zebra}</div>
-    </div>`;
 
   function parseQ(){
     const q=new URLSearchParams(location.search);
     const num = x => x==null? null : parseInt(x,10);
+
+    const c1 = normalizeAnimal(q.get("c1"), "dog");   // ✅ Standard: Hund
+    const c2 = normalizeAnimal(q.get("c2"), "zebra");
+
     return {
       s1: num(q.get("s1")) ?? 0,
       s2: num(q.get("s2")) ?? 0,
-      c1: q.get("c1") || "eule",
-      c2: q.get("c2") || "zebra",
-      // letzte Runde (für Anzeige)
+      c1,
+      c2,
+      // letzte Runde
       lp1: q.has("lp1") ? num(q.get("lp1")) : null,
       lp2: q.has("lp2") ? num(q.get("lp2")) : null,
-      // „Vorauswahl“ des Senders für die JETZT zu spielende Runde
-      n1: q.has("n1") ? num(q.get("n1")) : null, // Vorauswahl von Spieler 1
-      n2: q.has("n2") ? num(q.get("n2")) : null  // Vorauswahl von Spieler 2
+      // Vorauswahl
+      n1: q.has("n1") ? num(q.get("n1")) : null,
+      n2: q.has("n2") ? num(q.get("n2")) : null
     };
   }
 
@@ -97,29 +138,67 @@
     return u.toString();
   }
 
+  function setTitle(c1,c2){
+    const t = `✂️🪨📄 ${label(c1)} vs. ${label(c2)} — Schere • Stein • Papier`;
+    $("#title").textContent = t;
+    document.title = t;
+  }
+
+  // ✅ Dropdowns für Tiere (Startscreen)
+  function animalPickUI(c1,c2){
+    const keys = Object.keys(ANIMALS);
+    const opts = (sel) => keys.map(k =>
+      `<option value="${k}" ${k===sel?"selected":""}>${ANIMALS[k].emoji} ${ANIMALS[k].name}</option>`
+    ).join("");
+
+    return `
+      <div class="hint"><b>Wählt eure Tiere</b> (optional) — danach wählt Spieler 1 seinen Zug.</div>
+      <div class="pick">
+        <span class="pill2"><b>Spieler 1</b> <select id="pick-c1">${opts(c1)}</select></span>
+        <span class="pill2"><b>Spieler 2</b> <select id="pick-c2">${opts(c2)}</select></span>
+      </div>
+    `;
+  }
+
   // --- Start: P1 wählt erste „Vorauswahl“ (n1) und schickt Link an P2
-  function viewStart(s1=0,s2=0,c1="eule",c2="zebra"){
+  function viewStart(s1=0,s2=0,c1="dog",c2="zebra"){
     const el=$("#state-area");
+    setTitle(c1,c2);
+
     el.innerHTML = `
-      <div class="hint"><b>Du bist Spieler 1.</b> Wähle Charakter & deinen Zug für Runde 1.</div>
+      ${animalPickUI(c1,c2)}
+      <div class="sep"></div>
+      <div class="hint"><b>Du bist Spieler 1.</b> Wähle deinen Zug für Runde 1.</div>
       ${scoreView(s1,s2,c1,c2)}
-      ${charSelect(c1)}
       <div class="moves">${moveBtn(0)}${moveBtn(1)}${moveBtn(2)}</div>
     `;
-    document.querySelectorAll(".char-btn").forEach(b=>{
-      b.addEventListener("click",()=>{document.querySelectorAll(".char-btn").forEach(x=>x.classList.remove("active")); b.classList.add("active"); c1=b.dataset.c;});
-    });
+
+    // Dropdown-Handler
+    const pick1 = $("#pick-c1");
+    const pick2 = $("#pick-c2");
+    const rerender = ()=>{
+      c1 = normalizeAnimal(pick1.value,"dog");
+      c2 = normalizeAnimal(pick2.value,"zebra");
+      setTitle(c1,c2);
+      // optional: gleiche Tiere vermeiden? (hier erlauben wir es)
+    };
+    pick1.addEventListener("change", rerender);
+    pick2.addEventListener("change", rerender);
+
     el.querySelectorAll(".move-btn").forEach(btn=>{
       btn.addEventListener("click", ()=>{
+        rerender(); // sicherstellen, dass aktuelle Auswahl genutzt wird
         const n1 = parseInt(btn.dataset.m,10);
-        const url = linkTo({s1,s2,c1,c2,n1}); // enthält P1s Zug für R1
+        const url = linkTo({s1,s2,c1,c2,n1});
         el.innerHTML = `
           ${scoreView(s1,s2,c1,c2)}
-          <div class="hint">🔗 Sende diesen Link an ${CHAR[c2]} (Spieler 2):</div>
+          <div class="hint">🔗 Sende diesen Link an <b>${label(c2)}</b> (Spieler 2):</div>
           <textarea class="linkbox" readonly>${url}</textarea>
           <div class="row"><button class="primary copy" id="copy1">Link kopieren</button></div>
         `;
-        $("#copy1").addEventListener("click", async()=>{ await navigator.clipboard.writeText(url); $("#copy1").textContent="Kopiert ✅"; });
+        $("#copy1").addEventListener("click", async()=>{
+          try{ await navigator.clipboard.writeText(url); $("#copy1").textContent="Kopiert ✅"; }catch(e){}
+        });
       });
     });
   }
@@ -127,11 +206,12 @@
   // --- P2-Ansicht: spielt gegen n1, sieht Ergebnis SOFORT und wählt n2
   function viewP2(n1,s1,s2,c1,c2,lp1,lp2){
     const el=$("#state-area");
-    // ggf. letzte Runde anzeigen
+    setTitle(c1,c2);
+
     const last = (lp1!=null && lp2!=null) ? `
       <div class="row" style="flex-wrap:wrap">
-        <span class="pill">${CHAR[c1]}: <b>${CHOICES[lp1]}</b></span>
-        <span class="pill">${CHAR[c2]}: <b>${CHOICES[lp2]}</b></span>
+        <span class="pill">${label(c1)}: <b>${CHOICES[lp1]}</b></span>
+        <span class="pill">${label(c2)}: <b>${CHOICES[lp2]}</b></span>
       </div>
       <div class="sep"></div>` : "";
 
@@ -141,25 +221,28 @@
       <div class="hint"><b>Du bist Spieler 2.</b> Wähle jetzt deinen Zug für die aktuelle Runde:</div>
       <div class="moves" id="p2play">${moveBtn(0)}${moveBtn(1)}${moveBtn(2)}</div>
     `;
+
     $("#p2play").querySelectorAll(".move-btn").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const m2=parseInt(btn.dataset.m,10);
-        // Ergebnis sofort
+
         let ns1=s1, ns2=s2;
         const res=outcome(n1,m2);
         if(res==="p1") ns1++; else if(res==="p2") ns2++;
-        const label = res==="draw" ? "Unentschieden!"
-                    : res==="p1" ? `${CHAR[c1]} gewinnt die Runde!` 
-                    : `${CHAR[c2]} gewinnt die Runde!`;
+
+        const labelRes = res==="draw" ? "Unentschieden!"
+          : res==="p1" ? `${label(c1)} gewinnt die Runde!`
+          : `${label(c2)} gewinnt die Runde!`;
+
         const finished = ns1>=WIN || ns2>=WIN;
 
         el.innerHTML = `
           ${scoreView(ns1,ns2,c1,c2)}
           <div class="row" style="flex-wrap:wrap">
-            <span class="pill">${CHAR[c1]}: <b>${CHOICES[n1]}</b></span>
-            <span class="pill">${CHAR[c2]}: <b>${CHOICES[m2]}</b></span>
+            <span class="pill">${label(c1)}: <b>${CHOICES[n1]}</b></span>
+            <span class="pill">${label(c2)}: <b>${CHOICES[m2]}</b></span>
           </div>
-          <h2 class="outcome ${res==='p1'?'win':res==='p2'?'lose':'draw'}" style="margin:12px 0 0 0">${label}</h2>
+          <h2 class="outcome ${res==='p1'?'win':res==='p2'?'lose':'draw'}" style="margin:12px 0 0 0">${labelRes}</h2>
           ${finished ? '' : `
             <div class="sep"></div>
             <div class="hint">Wähle direkt deinen Zug für die <b>nächste Runde</b>:</div>
@@ -179,35 +262,38 @@
         $("#p2next").querySelectorAll(".move-btn").forEach(b2=>{
           b2.addEventListener("click", ()=>{
             const n2=parseInt(b2.dataset.m,10);
-            // Link an P1: enthält letzte Runde (lp1,lp2) + neuen s1/s2 + P2-Vorauswahl n2
             const url = linkTo({s1:ns1,s2:ns2,c1,c2,lp1:n1,lp2:m2,n2});
             el.innerHTML = `
               ${scoreView(ns1,ns2,c1,c2)}
-              <div class="hint">Sende diesen Link an ${CHAR[c1]}:</div>
+              <div class="hint">Sende diesen Link an <b>${label(c1)}</b> (Spieler 1):</div>
               <textarea class="linkbox" readonly>${url}</textarea>
               <div class="row"><button id="copy2" class="primary copy">Antwort-Link kopieren</button></div>
             `;
-            $("#copy2").addEventListener("click", async()=>{ await navigator.clipboard.writeText(url); $("#copy2").textContent="Kopiert ✅"; });
+            $("#copy2").addEventListener("click", async()=>{
+              try{ await navigator.clipboard.writeText(url); $("#copy2").textContent="Kopiert ✅"; }catch(e){}
+            });
           });
         });
       });
     });
   }
 
-  // --- P1-Ansicht: sieht Ergebnis der letzten Runde, spielt gegen n2, sieht Ergebnis sofort, wählt n1
+  // --- P1-Ansicht: spielt gegen n2, sieht Ergebnis sofort, wählt n1
   function viewP1(n2,s1,s2,c1,c2,lp1,lp2){
     const el=$("#state-area");
-    // Ergebnis der letzten Runde anzeigen
+    setTitle(c1,c2);
+
     const last = (lp1!=null && lp2!=null) ? (()=> {
       const r = outcome(lp1,lp2);
-      const label = r==="draw"?"Unentschieden!": r==="p1"? `${CHAR[c1]} gewinnt die Runde!` : `${CHAR[c2]} gewinnt die Runde!`;
+      const labelRes = r==="draw"?"Unentschieden!"
+        : r==="p1"? `${label(c1)} gewinnt die Runde!` : `${label(c2)} gewinnt die Runde!`;
       return `
         ${scoreView(s1,s2,c1,c2)}
         <div class="row" style="flex-wrap:wrap">
-          <span class="pill">${CHAR[c1]}: <b>${CHOICES[lp1]}</b></span>
-          <span class="pill">${CHAR[c2]}: <b>${CHOICES[lp2]}</b></span>
+          <span class="pill">${label(c1)}: <b>${CHOICES[lp1]}</b></span>
+          <span class="pill">${label(c2)}: <b>${CHOICES[lp2]}</b></span>
         </div>
-        <h2 class="outcome ${r==='p1'?'win':r==='p2'?'lose':'draw'}" style="margin:12px 0 0 0">${label}</h2>
+        <h2 class="outcome ${r==='p1'?'win':r==='p2'?'lose':'draw'}" style="margin:12px 0 0 0">${labelRes}</h2>
         <div class="sep"></div>
       `;
     })() : scoreView(s1,s2,c1,c2);
@@ -221,21 +307,24 @@
     $("#p1play").querySelectorAll(".move-btn").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const m1=parseInt(btn.dataset.m,10);
+
         let ns1=s1, ns2=s2;
         const res=outcome(m1,n2);
         if(res==="p1") ns1++; else if(res==="p2") ns2++;
-        const label = res==="draw" ? "Unentschieden!"
-                    : res==="p1" ? `${CHAR[c1]} gewinnt die Runde!`
-                    : `${CHAR[c2]} gewinnt die Runde!`;
+
+        const labelRes = res==="draw" ? "Unentschieden!"
+          : res==="p1" ? `${label(c1)} gewinnt die Runde!`
+          : `${label(c2)} gewinnt die Runde!`;
+
         const finished = ns1>=WIN || ns2>=WIN;
 
         el.innerHTML = `
           ${scoreView(ns1,ns2,c1,c2)}
           <div class="row" style="flex-wrap:wrap">
-            <span class="pill">${CHAR[c1]}: <b>${CHOICES[m1]}</b></span>
-            <span class="pill">${CHAR[c2]}: <b>${CHOICES[n2]}</b></span>
+            <span class="pill">${label(c1)}: <b>${CHOICES[m1]}</b></span>
+            <span class="pill">${label(c2)}: <b>${CHOICES[n2]}</b></span>
           </div>
-          <h2 class="outcome ${res==='p1'?'win':res==='p2'?'lose':'draw'}" style="margin:12px 0 0 0">${label}</h2>
+          <h2 class="outcome ${res==='p1'?'win':res==='p2'?'lose':'draw'}" style="margin:12px 0 0 0">${labelRes}</h2>
           ${finished ? '' : `
           <div class="sep"></div>
           <div class="hint">Wähle direkt deinen Zug für die <b>nächste Runde</b>:</div>
@@ -255,15 +344,16 @@
         $("#p1next").querySelectorAll(".move-btn").forEach(b2=>{
           b2.addEventListener("click", ()=>{
             const n1=parseInt(b2.dataset.m,10);
-            // Link zurück an P2: letzte Runde (lp1=m1, lp2=n2) + neue Scores + P1-Vorauswahl n1
             const url = linkTo({s1:ns1,s2:ns2,c1,c2,lp1:m1,lp2:n2,n1});
             el.innerHTML = `
               ${scoreView(ns1,ns2,c1,c2)}
-              <div class="hint">Sende diesen Link an ${CHAR[c2]}:</div>
+              <div class="hint">Sende diesen Link an <b>${label(c2)}</b> (Spieler 2):</div>
               <textarea class="linkbox" readonly>${url}</textarea>
-              <div class="row"><button id="copy3" class="primary copy">Beweis-/Next-Link kopieren</button></div>
+              <div class="row"><button id="copy3" class="primary copy">Next-Link kopieren</button></div>
             `;
-            $("#copy3").addEventListener("click", async()=>{ await navigator.clipboard.writeText(url); $("#copy3").textContent="Kopiert ✅"; });
+            $("#copy3").addEventListener("click", async()=>{
+              try{ await navigator.clipboard.writeText(url); $("#copy3").textContent="Kopiert ✅"; }catch(e){}
+            });
           });
         });
       });
@@ -276,10 +366,9 @@
 
     const {s1,s2,c1,c2,lp1,lp2,n1,n2} = parseQ();
 
-    // Logik:
-    // - n1 vorhanden => P2 ist dran, spielt gegen n1 (und sieht danach Ergebnis)
-    // - n2 vorhanden => P1 ist dran, spielt gegen n2 (und sieht danach Ergebnis)
-    // - beides fehlt => Start (P1 wählt ersten Zug)
+    // - n1 vorhanden => P2 ist dran
+    // - n2 vorhanden => P1 ist dran
+    // - beides fehlt => Start
     if(n1!=null){ viewP2(n1,s1,s2,c1,c2,lp1,lp2); return; }
     if(n2!=null){ viewP1(n2,s1,s2,c1,c2,lp1,lp2); return; }
     viewStart(s1,s2,c1,c2);
@@ -289,3 +378,4 @@
 </script>
 </body>
 </html>
+
